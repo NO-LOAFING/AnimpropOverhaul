@@ -431,20 +431,18 @@ if SERVER then
 
 					if const.Type == "PartCtrl_Ent" --[[or const.Type == "PartCtrl_SpecialEffect"]] and IsValid(const.Ent1) then //again, PartCtrl_SpecialEffect handling doesn't seem to be necessary here for some reason
 						oldent:DontDeleteOnRemove(const.Ent1) //Make sure we also clear deleteonremove for unparented cpoints
-						//if const.Type == "PartCtrl_Ent" then
-							//Tell clients to retrieve the updated info table (the constraint func will change the relevant value to point to our ent)
-							timer.Simple(0.1, function() //do this on a timer, otherwise the advbonemerge ent might not exist on the client yet when they receive the new table
-								net.Start("PartCtrl_InfoTableUpdate_SendToCl")
-									net.WriteEntity(const.Ent1)
-								net.Broadcast()
-							end)
-						//end
 					end
 
 					//Now copy the constraint over to the prop
 					duplicator.CreateConstraintFromTable(const, entstab)
 				end
 			end
+		end
+		//Unbreak all ParticleControlOverhaul fx attached to the prop or any of its children
+		if PartCtrl_RefreshAllChildFx then 
+			timer.Simple(0.1, function() //do this on a timer, otherwise the prop might not exist on the client yet when they receive the new table
+				PartCtrl_RefreshAllChildFx(prop)
+			end)
 		end
 
 
