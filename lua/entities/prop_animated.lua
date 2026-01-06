@@ -451,13 +451,13 @@ end
 
 //Ignore certain non-physics constraints for effect physics
 local ConstraintsToPreserve = {
-	["AdvBoneMerge"] = true,
-	["AttachParticleControllerBeam"] = true, //Advanced Particle Controller addon
-	["PartCtrl_Ent"] = true, //ParticleControlOverhaul
-	["PartCtrl_SpecialEffect"] = true, //ParticleControlOverhaul
-	["BoneMerge"] = true, //Bone Merger addon
-	["EasyBonemerge"] = true, //Easy Bonemerge Tool addon
-	["CompositeEntities_Constraint"] = true, //Composite Bonemerge addon
+	AdvBoneMerge = true,
+	AttachParticleControllerBeam = true, //Advanced Particle Controller addon
+	PartCtrl_Ent = true, //ParticleControlOverhaul
+	PartCtrl_SpecialEffect = true, //ParticleControlOverhaul
+	BoneMerge = true, //Bone Merger addon
+	EasyBonemerge = true, //Easy Bonemerge Tool addon
+	CompositeEntities_Constraint = true, //Composite Bonemerge addon
 }
 
 function ENT:Think()
@@ -877,8 +877,8 @@ function ENT:Think()
 				if !seqinfo then //someone reported a bug where seqinfo returned nil (bad sequence?); not sure what would make this happen, but just use modelbounds as a fallback
 					local mins, maxs = self:GetModelBounds()
 					seqinfo = {
-						["bbmin"] = mins,
-						["bbmax"] = maxs
+						bbmin = mins,
+						bbmax = maxs
 					}
 				end
 				local min, max = seqinfo.bbmin * scale, seqinfo.bbmax * scale
@@ -926,7 +926,7 @@ function ENT:Think()
 			//Sorry, no playing the same animation on multiple channels to make the spin speed stack.
 			local i = nil
 			for i2 = 1, 4 do
-				if self["GetChannel" .. tostring(i2) .. "Sequence"](self) == self:LookupSequence("fire_loop") then
+				if self["GetChannel" .. i2 .. "Sequence"](self) == self:LookupSequence("fire_loop") then
 					i = i2
 				end
 			end
@@ -1255,7 +1255,7 @@ if SERVER then
 						tabprocessed[tab2.Key] = tab2.Value
 					end
 
-					if tabprocessed["index"] == 0 then solidinfo = tabprocessed end
+					if tabprocessed.index == 0 then solidinfo = tabprocessed end
 				end
 			end
 		end
@@ -1332,10 +1332,10 @@ if SERVER then
 				self:UpdateAnimpropPhysics()
 			else
 				if solidinfo then
-					phys:SetMass(solidinfo["mass"] * scale * scale * scale)
-					phys:SetMaterial(solidinfo["surfaceprop"] or "")
-					phys:SetDamping(solidinfo["damping"], solidinfo["rotdamping"])
-					local inertia = solidinfo["inertia"]
+					phys:SetMass(solidinfo.mass * scale * scale * scale)
+					phys:SetMaterial(solidinfo.surfaceprop or "")
+					phys:SetDamping(solidinfo.damping, solidinfo.rotdamping)
+					local inertia = solidinfo.inertia
 					if inertia > 0 then phys:SetInertia(phys:GetInertia() * inertia) end
 				end
 
@@ -1380,7 +1380,7 @@ if SERVER then
 				phys:SetMass(newmass)
 
 				if solidinfo then
-					phys:SetMaterial(solidinfo["surfaceprop"] or "")
+					phys:SetMaterial(solidinfo.surfaceprop or "")
 				end
 
 				phys:Sleep()
@@ -1481,7 +1481,7 @@ local EditMenuInputs = {
 local EditMenuInputs_bits = 5 //max 31
 EditMenuInputs = table.Flip(EditMenuInputs)
 //How this works:
-//- table.Flip sets the table to {["channel_sequence"] = 0}, and so on
+//- table.Flip sets the table to {channel_sequence = 0}, and so on
 //- net.Write retrieves the corresponding number of a string with EditMenuInputs[input], then sends that number
 //- net.Read gets the number, then retrieves its corresponding string with table.KeyFromValue(EditMenuInputs, input)
 //This lets us add as many networkable strings to this table as we want, without having to manually assign each one a number.
@@ -1928,14 +1928,14 @@ if CLIENT then
 						tabprocessed[tab2.Key] = tab2.Value
 					end
 
-					ModelInfo.Solids[tabprocessed["index"]] = tabprocessed
+					ModelInfo.Solids[tabprocessed.index] = tabprocessed
 				end
 			end
 
 			//self:TranslateBoneToPhysBone() just doesn't work at all on some models (i.e. some "hexed" models like "team fortress 2 improved physics ragdolls hexed" return
 			//the original model's values even if the hexed model should give different ones, resulting in garbage), so we can't rely on it - make a table to use instead
 			for i = 0, table.Count(ModelInfo.Solids) - 1 do
-				BoneToPhysBone[self:LookupBone(ModelInfo.Solids[i]["name"])] = i
+				BoneToPhysBone[self:LookupBone(ModelInfo.Solids[i].name)] = i
 			end
 		else
 			//Can't get model info, so do error handling stuff copied from ragdoll resizer code and then end here
@@ -2058,7 +2058,7 @@ if CLIENT then
 							newpos.x = newpos.x / pscl.x
 							newpos.y = newpos.y / pscl.y
 							newpos.z = newpos.z / pscl.z
-							subtab["pos"] = newpos - self.RemapInfo_DefaultBoneOffsets[i].posoffset
+							subtab.pos = newpos - self.RemapInfo_DefaultBoneOffsets[i].posoffset
 
 							//From the perspective of the bone we want to rotate, get how much the new offset rotates the bone compared to the default offset, and use that as our ang manip
 							local newmatr2 = Matrix()
@@ -2066,7 +2066,7 @@ if CLIENT then
 							newmatr2:Rotate(self.RemapInfo_DefaultBoneOffsets[self:GetBoneParent(i)].ang)
 							newmatr2:Rotate(newang)
 							local newpos2, newang2 = WorldToLocal(newmatr2:GetTranslation(), newmatr2:GetAngles(), self.RemapInfo_DefaultBoneOffsets[i].pos, self.RemapInfo_DefaultBoneOffsets[i].ang)
-							subtab["ang"] = newang2
+							subtab.ang = newang2
 
 							tab2[i] = subtab
 						end
@@ -2098,7 +2098,7 @@ if CLIENT then
 							if scl.x != 1 or scl.y != 1 or scl.z != 1 then
 								//MsgN(self:GetBoneName(i), " scaled to ", scl)
 								tab2[i] = tab2[i] or {}
-								tab2[i]["scl"] = scl
+								tab2[i].scl = scl
 							end
 						end
 					end
@@ -2146,7 +2146,7 @@ if CLIENT then
 									if scl.x != 1 or scl.y != 1 or scl.z != 1 then
 										//MsgN(self:GetBoneName(i), " scaled to ", scl)
 										tab2[i] = tab2[i] or {}
-										tab2[i]["scl"] = scl
+										tab2[i].scl = scl
 									end
 								end
 							end
@@ -2361,9 +2361,9 @@ else
 			tab2 = {}
 			for i = 1, count2 do
 				tab2[net.ReadUInt(9)] = {
-					["pos"] = net.ReadVector(),
-					["ang"] = net.ReadAngle(),
-					["scl"] = net.ReadVector(),
+					pos = net.ReadVector(),
+					ang = net.ReadAngle(),
+					scl = net.ReadVector(),
 				}
 			end
 		end
@@ -2375,8 +2375,8 @@ else
 			tab3 = {}
 			for i = 1, count do
 				tab3[net.ReadUInt(9)] = {
-					["vel"] = net.ReadVector(),
-					["angVel"] = net.ReadVector(),
+					vel = net.ReadVector(),
+					angVel = net.ReadVector(),
 				}
 			end
 			self.PhysBoneVelocities = tab3
@@ -2414,14 +2414,14 @@ else
 						tabprocessed[tab2.Key] = tab2.Value
 					end
 
-					ModelInfo.Solids[tabprocessed["index"]] = tabprocessed
+					ModelInfo.Solids[tabprocessed.index] = tabprocessed
 				end
 			end
 
 			//self:TranslateBoneToPhysBone() just doesn't work at all on some models (i.e. some "hexed" models like "team fortress 2 improved physics ragdolls hexed" return
 			//the original model's values even if the hexed model should give different ones, resulting in garbage), so we can't rely on it - make a table to use instead
 			for i = 0, table.Count(ModelInfo.Solids) - 1 do
-				BoneToPhysBone[self:LookupBone(ModelInfo.Solids[i]["name"])] = i
+				BoneToPhysBone[self:LookupBone(ModelInfo.Solids[i].name)] = i
 			end
 		else
 			//Don't bother with all the error message crap again, it should've been caught clientside already
@@ -2521,11 +2521,11 @@ else
 			local phys = rag:GetPhysicsObjectNum(i)
 			if IsValid(phys) then
 				phys:EnableMotion(false)
-				if ModelInfo.Solids[i]["parent"] then
-					local parphys = rag:GetPhysicsObjectNum( BoneToPhysBone[ rag:LookupBone(ModelInfo.Solids[i]["parent"]) ] )
+				if ModelInfo.Solids[i].parent then
+					local parphys = rag:GetPhysicsObjectNum( BoneToPhysBone[ rag:LookupBone(ModelInfo.Solids[i].parent) ] )
 					if IsValid(parphys) then
 						local pos, _ = WorldToLocal(phys:GetPos(), phys:GetAngles(), parphys:GetPos(), parphys:GetAngles())
-						ModelInfo.Solids[i]["parentoffset"] = pos
+						ModelInfo.Solids[i].parentoffset = pos
 					end
 				end
 			end
@@ -2538,11 +2538,11 @@ else
 				phys:Wake()
 				if matr then
 					local pos = nil
-					if ModelInfo.Solids[i]["parent"] and ModelInfo.Solids[i]["parentoffset"] and ModelInfo.Solids[i]["parent"] != ModelInfo.Solids[i]["name"] then
+					if ModelInfo.Solids[i].parent and ModelInfo.Solids[i].parentoffset and ModelInfo.Solids[i].parent != ModelInfo.Solids[i].name then
 						//Physobj has a parent physobj, so maintain its pos offset from the parent so it doesn't end up in a position that doesn't match its visuals
-						local parphys = rag:GetPhysicsObjectNum( BoneToPhysBone[ rag:LookupBone(ModelInfo.Solids[i]["parent"]) ] )
+						local parphys = rag:GetPhysicsObjectNum( BoneToPhysBone[ rag:LookupBone(ModelInfo.Solids[i].parent) ] )
 						if IsValid(parphys) then
-							pos = LocalToWorld(ModelInfo.Solids[i]["parentoffset"], Angle(), parphys:GetPos(), parphys:GetAngles())
+							pos = LocalToWorld(ModelInfo.Solids[i].parentoffset, Angle(), parphys:GetPos(), parphys:GetAngles())
 						end
 					else
 						//Physobj doesn't have a parent physobj, so move it to the location from the matrix
@@ -2887,13 +2887,13 @@ else
 				local forceVector = CalcDamageForceVector()
 
 				self.DoRagdollizeOnDamage = {
-					["type"] = dmg:GetDamageType(),
-					["force"] = forceVector or Vector(0,0,0),
-					["pos"] = dmg:GetDamagePosition(),
-					["doforcebone"] = self.LastTraceHit == CurTime(),
-					["attacker"] = dmg:GetAttacker(),
-					["inflictor"] = dmg:GetInflictor(),
-					["time"] = CurTime() + 5
+					type = dmg:GetDamageType(),
+					force = forceVector or Vector(0,0,0),
+					pos = dmg:GetDamagePosition(),
+					doforcebone = self.LastTraceHit == CurTime(),
+					attacker = dmg:GetAttacker(),
+					inflictor = dmg:GetInflictor(),
+					time = CurTime() + 5
 				}
 
 				self:SetHealth(0) //try to make sure we can't get damaged more than once, which can happen in some cases like physics collisions
@@ -3146,7 +3146,7 @@ function ENT:OnEntityCopyTableFinish(data)
 			data.DT["Channel" .. i .. "LayerID"] = nil
 			data.DT["Channel" .. i .. "NumpadState"] = nil
 		end
-		data.DT["Puppeteer"] = nil
+		data.DT.Puppeteer = nil
 	end
 
 	//Store sequences as strings instead of IDs - otherwise, if the model gets updated with new animations, the IDs will shift around and animprop dupes/saves will be playing the wrong 
@@ -3389,12 +3389,12 @@ if SERVER then
 		if defaultact != ACT_INVALID and defaultact != ACT_DIERAGDOLL then
 			local sequence = self:SelectWeightedSequence(ACT_DIERAGDOLL)
 			if sequence != -1 then
-				self["SetChannel1Sequence"](self, sequence)
+				self:SetChannel1Sequence(sequence)
 			else
-				self["SetChannel1Sequence"](self, -1)
+				self:SetChannel1Sequence(-1)
 			end
 		else
-			self["SetChannel1Sequence"](self, -1)
+			self:SetChannel1Sequence(-1)
 		end
 		for i = 1, 4 do
 			if i != 1 then
@@ -3410,7 +3410,7 @@ if SERVER then
 		if defaultact != ACT_INVALID and defaultact != ACT_DIERAGDOLL then
 			local sequence = animprop:SelectWeightedSequence(ACT_DIERAGDOLL)
 			if sequence != -1 then
-				animprop["SetChannel1Sequence"](animprop, sequence)
+				animprop:SetChannel1Sequence(sequence)
 			end
 		end
 
@@ -3521,8 +3521,8 @@ if SERVER then
 			for key, entry in pairs (ent.RemapInfo) do
 				net.WriteInt(key, 9)
 
-				net.WriteInt(ent:GetPuppeteer():LookupBone( entry["parent"] ) or -1, 9)
-				net.WriteAngle(entry["ang"])
+				net.WriteInt(ent:GetPuppeteer():LookupBone(entry.parent) or -1, 9)
+				net.WriteAngle(entry.ang)
 			end
 		net.Send(ply)
 	end)
@@ -3540,12 +3540,12 @@ if SERVER then
 
 		if IsValid(ent) and ent:GetClass() == "prop_animated" and IsValid(ent:GetPuppeteer()) and ent.RemapInfo and ent.RemapInfo[entbone] then
 			if newtargetbone != -1 then
-				ent.RemapInfo[entbone]["parent"] = ent:GetPuppeteer():GetBoneName(newtargetbone)
+				ent.RemapInfo[entbone].parent = ent:GetPuppeteer():GetBoneName(newtargetbone)
 			else
-				ent.RemapInfo[entbone]["parent"] = ""
+				ent.RemapInfo[entbone].parent = ""
 			end
 
-			ent.RemapInfo[entbone]["ang"] = newang
+			ent.RemapInfo[entbone].ang = newang
 
 			//Tell all the other clients that they need to update their RemapInfo tables to receive the changes (the original client already has the changes applied)
 			local filter = RecipientFilter()
@@ -3584,8 +3584,8 @@ else
 			end
 
 			tab[key] = {
-				["parent"] = parentstr,
-				["ang"] = net.ReadAngle(),
+				parent = parentstr,
+				ang = net.ReadAngle(),
 			}
 		end
 
@@ -3753,21 +3753,21 @@ if CLIENT then
 					//Get the bone's offset from its parent
 					local parentmatr = self.csmodel:GetBoneMatrix(parentboneid)
 					if ourmatr == nil then return end  //TODO: why does this happen? does the model need to be precached or something?
-					newentry["posoffset"], newentry["angoffset"] = WorldToLocal(ourmatr:GetTranslation(), ourmatr:GetAngles(), parentmatr:GetTranslation(), parentmatr:GetAngles())
-					newentry["pos"], newentry["ang"] = WorldToLocal(ourmatr:GetTranslation(), ourmatr:GetAngles(), self:GetPos(), self:GetAngles())
+					newentry.posoffset, newentry.angoffset = WorldToLocal(ourmatr:GetTranslation(), ourmatr:GetAngles(), parentmatr:GetTranslation(), parentmatr:GetAngles())
+					newentry.pos, newentry.ang = WorldToLocal(ourmatr:GetTranslation(), ourmatr:GetAngles(), self:GetPos(), self:GetAngles())
 				else
 					//If a bone doesn't have a parent, then get its offset from the model origin
 					ourmatr = self.csmodel:GetBoneMatrix(i)
 					if ourmatr != nil then
-						newentry["posoffset"], newentry["angoffset"] = WorldToLocal(ourmatr:GetTranslation(), ourmatr:GetAngles(), self.csmodel:GetPos(), self.csmodel:GetAngles())
-						newentry["pos"], newentry["ang"] = WorldToLocal(ourmatr:GetTranslation(), ourmatr:GetAngles(), self:GetPos(), self:GetAngles())
+						newentry.posoffset, newentry.angoffset = WorldToLocal(ourmatr:GetTranslation(), ourmatr:GetAngles(), self.csmodel:GetPos(), self.csmodel:GetAngles())
+						newentry.pos, newentry.ang = WorldToLocal(ourmatr:GetTranslation(), ourmatr:GetAngles(), self:GetPos(), self:GetAngles())
 					end
 				end
-				if !newentry["posoffset"] then //note: if we end up using this placeholder table for the root bone, then remapping kind of sucks, but it's better than nothing i guess
-					newentry["posoffset"] = Vector(0,0,0)
-					newentry["angoffset"] = Angle(0,0,0)
-					newentry["pos"] = Vector(0,0,0)
-					newentry["ang"] = Angle(0,0,0)
+				if !newentry.posoffset then //note: if we end up using this placeholder table for the root bone, then remapping kind of sucks, but it's better than nothing i guess
+					newentry.posoffset = Vector(0,0,0)
+					newentry.angoffset = Angle(0,0,0)
+					newentry.pos = Vector(0,0,0)
+					newentry.ang = Angle(0,0,0)
 				end
 				table.insert(defaultboneoffsets, i, newentry)
 			end
@@ -3927,9 +3927,9 @@ if CLIENT then
 				if ref[parentboneid] then
 					matr:Set(ref[parentboneid])
 				end
-				//matr:Translate(self.RemapInfo_DefaultBoneOffsets[i]["posoffset"]) //pos isn't necessary here
-				matr:Rotate(self.RemapInfo_DefaultBoneOffsets[i]["angoffset"])
-				matr:Rotate(self.RemapInfo[i]["ang"])
+				//matr:Translate(self.RemapInfo_DefaultBoneOffsets[i].posoffset) //pos isn't necessary here
+				matr:Rotate(self.RemapInfo_DefaultBoneOffsets[i].angoffset)
+				matr:Rotate(self.RemapInfo[i].ang)
 				ref[i] = matr
 			end
 
@@ -3938,7 +3938,7 @@ if CLIENT then
 			for k, v in pairs (self.RemapInfo) do
 				local remapboneid = puppeteer:LookupBone(self.RemapInfo[k].parent)
 				if remapboneid then
-					local _, ang = WorldToLocal(ref[k]:GetTranslation(), ref[k]:GetAngles(), puppeteer.RemapInfo_DefaultBoneOffsets[remapboneid]["pos"], puppeteer.RemapInfo_DefaultBoneOffsets[remapboneid]["ang"])
+					local _, ang = WorldToLocal(ref[k]:GetTranslation(), ref[k]:GetAngles(), puppeteer.RemapInfo_DefaultBoneOffsets[remapboneid].pos, puppeteer.RemapInfo_DefaultBoneOffsets[remapboneid].ang)
 					remapangoffsets[k] = ang
 				end
 			end
@@ -3955,26 +3955,26 @@ if CLIENT then
 			//We don't need to get the offset for bones that are attached to something, because those ones won't animate (unless we're remapping it, in which case we need it for later)
 			local targetboneid = nil
 			if parent then targetboneid = parent:LookupBone(self.AdvBone_BoneInfo[i].parent) end
-			if !targetboneid or (puppeteer and puppeteer:LookupBone(self.RemapInfo[i]["parent"])) then  //TODO: from the testing we've done, remapping SEEMS to be okay if we don't have boneoffsets for nonremapped merged bones, but are there any weird edge cases we haven't found?
+			if !targetboneid or (puppeteer and puppeteer:LookupBone(self.RemapInfo[i].parent)) then  //TODO: from the testing we've done, remapping SEEMS to be okay if we don't have boneoffsets for nonremapped merged bones, but are there any weird edge cases we haven't found?
 				local newentry = {}
 				local parentboneid = self:GetBoneParent(i)
 				if parentboneid and parentboneid != -1 then
 					//Get the bone's offset from its parent
 					local parentmatr = self:GetBoneMatrix(parentboneid)
 					if ourmatr == nil then return end //TODO: why does this happen? does the model need to be precached or something?
-					newentry["posoffset"], newentry["angoffset"] = WorldToLocal(ourmatr:GetTranslation(), ourmatr:GetAngles(), parentmatr:GetTranslation(), parentmatr:GetAngles())
+					newentry.posoffset, newentry.angoffset = WorldToLocal(ourmatr:GetTranslation(), ourmatr:GetAngles(), parentmatr:GetTranslation(), parentmatr:GetAngles())
 				else
 					//If a bone doesn't have a parent, then get its offset from the model origin
 					if ourmatr != nil then
-						newentry["posoffset"], newentry["angoffset"] = WorldToLocal(ourmatr:GetTranslation(), ourmatr:GetAngles(), self:GetPos(), self:GetAngles())
+						newentry.posoffset, newentry.angoffset = WorldToLocal(ourmatr:GetTranslation(), ourmatr:GetAngles(), self:GetPos(), self:GetAngles())
 					end
 				end
 
-				if !newentry["posoffset"] then
-					newentry["posoffset"] = Vector(0,0,0)
-					newentry["angoffset"] = Angle(0,0,0)
+				if !newentry.posoffset then
+					newentry.posoffset = Vector(0,0,0)
+					newentry.angoffset = Angle(0,0,0)
 				else
-					newentry["posoffset"]:Div(mdlscl)
+					newentry.posoffset:Div(mdlscl)
 				end
 				table.insert(boneoffsets, i, newentry)
 			end
@@ -4024,24 +4024,24 @@ if CLIENT then
 					//matr:SetAngles(puppeteer:GetAngles())
 				end
 
-				matr:Translate(boneoffsets[i]["posoffset"])
+				matr:Translate(boneoffsets[i].posoffset)
 				if remapbonematr then
-					local diff_pos = puppeteer.BoneOffsets[remapboneid]["posoffset"] - puppeteer.RemapInfo_DefaultBoneOffsets[remapboneid]["posoffset"]
+					local diff_pos = puppeteer.BoneOffsets[remapboneid].posoffset - puppeteer.RemapInfo_DefaultBoneOffsets[remapboneid].posoffset
 					matr:Translate(diff_pos)
 					matr:SetAngles(remapbonematr:GetAngles())
 					matr:Rotate(self.RemapInfo_RemapAngOffsets[i])
 				else
-					matr:Rotate(boneoffsets[i]["angoffset"])
+					matr:Rotate(boneoffsets[i].angoffset)
 				end
 
 				if remapbonematr then
 					local newentry = {}
 					if ref[parentboneid] then
 						//Get the bone's offset from its parent
-						newentry["posoffset"], newentry["angoffset"] = WorldToLocal(matr:GetTranslation(), matr:GetAngles(), ref[parentboneid]:GetTranslation(), ref[parentboneid]:GetAngles())
+						newentry.posoffset, newentry.angoffset = WorldToLocal(matr:GetTranslation(), matr:GetAngles(), ref[parentboneid]:GetTranslation(), ref[parentboneid]:GetAngles())
 					else
 						//If a bone doesn't have a parent, then get its offset from the model origin
-						newentry["posoffset"], newentry["angoffset"] = WorldToLocal(matr:GetTranslation(), matr:GetAngles(), self:GetPos(), self:GetAngles())
+						newentry.posoffset, newentry.angoffset = WorldToLocal(matr:GetTranslation(), matr:GetAngles(), self:GetPos(), self:GetAngles())
 					end
 					boneoffsets[i] = newentry
 				end
@@ -4212,14 +4212,14 @@ if CLIENT then
 							if Vector(math.Round(matrscl.x,4), math.Round(matrscl.y,4), math.Round(matrscl.z,4)) != mdlsclvec then
 								local angmatr = Matrix()
 								angmatr:SetAngles(self.AdvBone_Angs[parentboneid] or matr:GetAngles())
-								angmatr:Rotate(boneoffsets[i]["angoffset"])
+								angmatr:Rotate(boneoffsets[i].angoffset)
 								angmatr:Rotate(self:GetManipulateBoneAngles(i))
 								self.AdvBone_Angs[i] = angmatr:GetAngles()
 								angmatr = nil
 							end
 
 							//Apply pos offset
-							matr:Translate(boneoffsets[i]["posoffset"])
+							matr:Translate(boneoffsets[i].posoffset)
 						else
 							//Create a new matrix and just copy over the translation and angle
 							matr = Matrix()
@@ -4234,20 +4234,20 @@ if CLIENT then
 								//(our distance from the parent bone should be the same regardless of whether we're scaling with it or not - otherwise we'd
 								//end up embedded inside the parent bone if it was scaled up, or end up far away from it if it was scaled down)
 								local tr1 = parentmatr:GetTranslation()
-								parentmatr:Translate(boneoffsets[i]["posoffset"])
+								parentmatr:Translate(boneoffsets[i].posoffset)
 								local tr2 = parentmatr:GetTranslation()
 								local posoffsetscaled = WorldToLocal(tr2, Angle(), tr1, matr:GetAngles())
 								matr:Translate(posoffsetscaled / mdlscl)
 							else
 								//If the advbonemerge addon is uninstalled, then emulate the default garrymanip behavior, where parent's scale doesn't affect offset
 								//(this code should only be running if we're remapping)
-								matr:Translate(boneoffsets[i]["posoffset"])
+								matr:Translate(boneoffsets[i].posoffset)
 							end
 						end
 
 						//Apply pos manip and ang offset/manip
 						matr:Translate(self:GetManipulateBonePosition(i))
-						matr:Rotate(boneoffsets[i]["angoffset"])
+						matr:Rotate(boneoffsets[i].angoffset)
 						matr:Rotate(self:GetManipulateBoneAngles(i))
 					end
 				end
@@ -4484,16 +4484,16 @@ if SERVER then
 			}				//Also turn it off for animprops created without the advanced bonemerge tool installed.
 
 			if self.AdvBone_BoneInfo and self.AdvBone_BoneInfo[i] then
-				newsubtable["scale"] = self.AdvBone_BoneInfo[i]["scale"]
+				newsubtable.scale = self.AdvBone_BoneInfo[i].scale
 			end
 
 			if !keepparentempty then
 				if self.AdvBone_BoneInfo and !self.AdvBone_BoneInfo_IsDefault and self.AdvBone_BoneInfo[i] //NOTE: Unlike regular advbonemerged ents, we check for IsDefault here, because even if we're default we still keep our BoneInfo table on unmerge.
-				and ( ( IsValid(par) and par:LookupBone( self.AdvBone_BoneInfo[i]["parent"] ) ) or self.AdvBone_BoneInfo[i]["parent"] == "" ) then
+				and ( ( IsValid(par) and par:LookupBone( self.AdvBone_BoneInfo[i].parent ) ) or self.AdvBone_BoneInfo[i].parent == "" ) then
 					//If we already have a BoneInfo table to use, then get the value from it, but only if the listed target bone exists/is an empty string
-					newsubtable["parent"] = self.AdvBone_BoneInfo[i]["parent"]
+					newsubtable.parent = self.AdvBone_BoneInfo[i].parent
 				elseif matchnames and i != -1 and IsValid(par) and par:LookupBone( self:GetBoneName(i) ) then
-					newsubtable["parent"] = string.lower( self:GetBoneName(i) )
+					newsubtable.parent = string.lower( self:GetBoneName(i) )
 				end
 
 				//If we're not parented and we're making a new table, then replace the target bone entry with something 
@@ -4501,7 +4501,7 @@ if SERVER then
 				//TODO: If the player changes any settings for this bone, this'll become an empty string instead and won't get overwritten. Is this good enough?
 				//TODO: is this still necessary now that we've implemented self.AdvBone_BoneInfo_IsDefault?
 				//if !IsValid(par) and !self.AdvBone_BoneInfo then
-				//	newsubtable["parent"] = "null_overridethis"
+				//	newsubtable.parent = "null_overridethis"
 				//end
 			end
 

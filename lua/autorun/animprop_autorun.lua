@@ -386,13 +386,13 @@ if SERVER then
 
 		//Copy certain non-physics constraints over to the animprop
 		local ConstraintsToPreserve = {
-			["AdvBoneMerge"] = true,
-			["AttachParticleControllerBeam"] = true, //Advanced Particle Controller addon
-			["PartCtrl_Ent"] = true, //ParticleControlOverhaul
-			["PartCtrl_SpecialEffect"] = true, //ParticleControlOverhaul
-			//["BoneMerge"] = true, //Bone Merger addon
-			["EasyBonemerge"] = true, //Easy Bonemerge Tool addon
-			["CompositeEntities_Constraint"] = true, //Composite Bonemerge addon
+			AdvBoneMerge = true,
+			AttachParticleControllerBeam = true, //Advanced Particle Controller addon
+			PartCtrl_Ent = true, //ParticleControlOverhaul
+			PartCtrl_SpecialEffect = true, //ParticleControlOverhaul
+			//BoneMerge = true, //Bone Merger addon
+			EasyBonemerge = true, //Easy Bonemerge Tool addon
+			CompositeEntities_Constraint = true, //Composite Bonemerge addon
 		}
 		local oldentconsts = constraint.GetTable(oldent)
 		for k, const in pairs (oldentconsts) do
@@ -510,7 +510,7 @@ if CLIENT then
 							if back and back.BoneList then
 								local id1 = back.BoneList.selectedbone
 								local id2 = -1
-								local targetbonestr = ent.RemapInfo[id1]["parent"]
+								local targetbonestr = ent.RemapInfo[id1].parent
 								if targetbonestr != "" then id2 = ent2:LookupBone(targetbonestr) end
 
 								local function DrawBonePos(_ent, id)

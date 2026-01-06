@@ -1528,12 +1528,12 @@ function PANEL:RebuildControls(tab, d, d2, d3)
 			//First, apply the new RemapInfo clientside
 			if !back.BoneList.UpdatingRemapOptions then
 				if newtargetbone != -1 then
-					ent.RemapInfo[entbone]["parent"] = ent2:GetBoneName(newtargetbone)
+					ent.RemapInfo[entbone].parent = ent2:GetBoneName(newtargetbone)
 				else
-					ent.RemapInfo[entbone]["parent"] = ""
+					ent.RemapInfo[entbone].parent = ""
 				end
 
-				ent.RemapInfo[entbone]["ang"] = newang
+				ent.RemapInfo[entbone].ang = newang
 
 
 				//Wake up BuildBonePositions and get it to use the new info
@@ -1578,7 +1578,7 @@ function PANEL:RebuildControls(tab, d, d2, d3)
 
 				local selectedtargetbone = -1
 				if ent.RemapInfo and ent.RemapInfo[id] then
-					local targetbonestr = ent.RemapInfo[id]["parent"]
+					local targetbonestr = ent.RemapInfo[id].parent
 					if targetbonestr != "" then selectedtargetbone = ent2:LookupBone(targetbonestr) end
 				end
 				if selectedtargetbone != -1 then line.HasTargetBone = true end
@@ -1629,7 +1629,7 @@ function PANEL:RebuildControls(tab, d, d2, d3)
 			//Don't let the options accidentally update anything while we're changing their values like this
 			list.UpdatingRemapOptions = true
 
-			local ang = ent.RemapInfo[boneid]["ang"]
+			local ang = ent.RemapInfo[boneid].ang
 
 			//if the keyboard focus is on a slider's text field when we update the slider's value, then the text value won't update correctly,
 			//so make sure to take the focus off of the text fields first
@@ -1647,7 +1647,7 @@ function PANEL:RebuildControls(tab, d, d2, d3)
 			back.slider_ang_y.TextArea:SetText( back.slider_ang_y.Scratch:GetTextValue() )
 			back.slider_ang_r.TextArea:SetText( back.slider_ang_r.Scratch:GetTextValue() )
 
-			local bonename = ent.RemapInfo[boneid]["parent"]
+			local bonename = ent.RemapInfo[boneid].parent
 			if ent2:LookupBone(bonename) then
 				back.TargetBoneList:SetValue(bonename)
 				back.TargetBoneList.selectedtargetbone = ent2:LookupBone(bonename)
