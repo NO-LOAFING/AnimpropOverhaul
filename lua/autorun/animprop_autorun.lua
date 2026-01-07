@@ -148,6 +148,9 @@ properties.Add("makeanimprop", {
 		//to remove things, then they shouldn't be allowed to turn things into animated props either
 		if !gamemode.Call("CanProperty", ply, "remover", ent) then return false end
 
+		//If this is an old animprop entity, don't show this option, instead show the upgrade option
+		if properties.List["animprop_backcomp"]:Filter(ent, ply) then return false end
+
 		return true
 
 	end,
