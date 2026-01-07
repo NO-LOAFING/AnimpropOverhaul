@@ -3783,6 +3783,7 @@ if CLIENT then
 
 		local parent = self:GetParent()
 		if !IsValid(parent) then
+			//If this ent isn't parented, bonemanipped, or puppeteered, then stop here, no need for expensive bone pos calculation
 			if table.Count(self.AdvBone_BoneManips) == 0 and !IsValid(self:GetPuppeteer()) then return end
 			parent = nil
 		else
