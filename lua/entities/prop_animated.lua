@@ -754,7 +754,7 @@ function ENT:Think()
 
 
 		//(Advanced Bonemerge) (Remapping) If an animation is playing, don't let BuildBonePositions fall asleep
-		if self.IsPuppeteer or (table.Count(self.AdvBone_BoneManips) > 0 and !IsValid(self:GetPuppeteer())) then //don't do all these checks if we're not running buildbonepositions, or if our puppeteer is doing it for us
+		if IsValid(parent) or self.IsPuppeteer or (table.Count(self.AdvBone_BoneManips) > 0 and !IsValid(self:GetPuppeteer())) then //don't do all these checks if we're not running buildbonepositions, or if our puppeteer is doing it for us
 			local animplaying = false
 			for i = 1, 4 do
 				local seq = self["GetChannel" .. i .. "Sequence"](self)
