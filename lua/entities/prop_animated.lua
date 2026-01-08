@@ -1024,10 +1024,17 @@ if SERVER then
 		end
 		local loopmode = self["GetChannel" .. i .. "LoopMode"](self)
 		local loopdelay = self["GetChannel" .. i .. "LoopDelay"](self)
-		if loopmode == 1 then
+		if loopmode == 1 then //Repeat X seconds after ending
 			self.AnimNextLoop[i] = self.AnimNextStop[i] + loopdelay
-		elseif loopmode == 2 then
-			self.AnimNextLoop[i] = CurTime() + loopdelay
+		elseif loopmode == 2 then //Repeat every X seconds
+			//If we're starting in the middle of the animation, then reduce the loop time to compensate. (i.e. if we set it to loop 
+			//every 3 secs, and then we pause and unpause it at 1.2 secs, then it should pick up where it left off, and loop after 
+			//1.8 more secs to match a "normal" loop, not reset the timer all the way back up to 3 in the middle of the animation.)
+			if speed >= 0 then
+				self.AnimNextLoop[i] = CurTime() + loopdelay - (durationfull * startframe) + (startpoint * durationfull)
+			else
+				self.AnimNextLoop[i] = CurTime() + loopdelay - (durationfull * math.abs(startframe - 1)) + ((1 - endpoint) * durationfull)
+			end
 		end
 
 
