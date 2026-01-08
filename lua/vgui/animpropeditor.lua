@@ -1023,9 +1023,9 @@ function PANEL:RebuildControls(tab, d, d2, d3)
 				//pause:SetToggle(true)
 			else
 				local seq = animent["GetChannel" .. i .. "Sequence"](animent)
-				if !(seq <= 0)								//not an invalid animation
-				and animent:SequenceDuration(seq) > 0					//not a single-frame animation
-				and (!pnldisabled or !pnldisabled.NumpadIsDisabling) then		//not disabled by numpad
+				if !(seq < 0)							//not an invalid animation
+				and animent:SequenceDuration(seq) > 0.034			//not a single-frame animation
+				and (!pnldisabled or !pnldisabled.NumpadIsDisabling) then	//not disabled by numpad
 					local cycle = nil
 					if i == 1 then
 						cycle = animent:GetCycle()

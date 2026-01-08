@@ -311,7 +311,7 @@ if SERVER then
 		for i = 2, 4 do
 			prop["SetChannel" .. i .. "LayerSettings"](prop, Vector(0,0,1))
 		end
-		//carry over the sequence if we convert something like an npc, but make sure ragdolls and the like still start out with no sequence
+		//carry over the sequence if we convert something like an npc; ragdolls will start off with either no sequence or the ref pose sequence
 		if ent:SequenceDuration() > 0 then
 			prop:SetChannel1Sequence(ent:GetSequence())
 		end

@@ -573,11 +573,11 @@ function ENT:Think()
 				end
 			end
 
-			if !(seq <= 0)								//not an invalid animation
-			and self:SequenceDuration(seq) > 0					//not a single-frame animation
-			and !self["GetChannel" .. i .. "Pause"](self)				//not paused
-			and !numpadisdisabling  						//not disabled by numpad
-			and (self["GetChannel" .. i .. "Speed"](self) != 0) then		//not at 0 speed
+			if !(seq < 0)							//not an invalid animation
+			and self:SequenceDuration(seq) > 0.034				//not a single-frame animation
+			and !self["GetChannel" .. i .. "Pause"](self)			//not paused
+			and !numpadisdisabling  					//not disabled by numpad
+			and (self["GetChannel" .. i .. "Speed"](self) != 0) then	//not at 0 speed
 
 				if self["GetChannel" .. i .. "LoopMode"](self) > 0 and time >= self.AnimNextLoop[i] then
 
@@ -767,11 +767,11 @@ function ENT:Think()
 					end
 				end
 
-				if !(seq <= 0)								//not an invalid animation
-				and self:SequenceDuration(seq) > 0					//not a single-frame animation
-				and !self["GetChannel" .. i .. "Pause"](self)				//not paused
-				and !numpadisdisabling  						//not disabled by numpad
-				and (self["GetChannel" .. i .. "Speed"](self) != 0) then		//not at 0 speed
+				if !(seq < 0)							//not an invalid animation
+				and self:SequenceDuration(seq) > 0.034				//not a single-frame animation
+				and !self["GetChannel" .. i .. "Pause"](self)			//not paused
+				and !numpadisdisabling  					//not disabled by numpad
+				and (self["GetChannel" .. i .. "Speed"](self) != 0) then	//not at 0 speed
 					animplaying = true
 					break
 				end
@@ -2207,12 +2207,12 @@ if CLIENT then
 						id = animent["GetChannel" .. i .. "LayerID"](animent)
 					end
 
-					if !(seq <= 0)								//not an invalid animation
-					and animent:SequenceDuration(seq) > 0					//not a single-frame animation
-					and !animent["GetChannel" .. i .. "Pause"](animent)			//not paused
-					and !numpadisdisabling  						//not disabled by numpad
-					and (speed != 0)							//not at 0 speed
-					and (1 == 1 or (id != -1 and animent:IsValidLayer(id)))	then		//not an invalid animation layer
+					if !(seq < 0)							//not an invalid animation
+					and animent:SequenceDuration(seq) > 0.034			//not a single-frame animation
+					and !animent["GetChannel" .. i .. "Pause"](animent)		//not paused
+					and !numpadisdisabling  					//not disabled by numpad
+					and (speed != 0)						//not at 0 speed
+					and (1 == 1 or (id != -1 and animent:IsValidLayer(id)))	then	//not an invalid animation layer
 						local cycle = nil
 						if i == 1 then
 							cycle = animent:GetCycle()
