@@ -791,6 +791,7 @@ function ENT:Think()
 		if !self.AdvBone_BoneInfo_Received and duplicator.FindEntityClass("ent_advbonemerge") then
 			net.Start("AdvBone_EntBoneInfoTable_GetFromSv", true)
 				net.WriteEntity(self)
+				net.WriteBool(self.AdvBone_BoneManips_ShouldGet)
 			net.SendToServer()
 		end
 
@@ -3675,6 +3676,8 @@ if CLIENT then
 
 		//Create a clientside advbone manips table so that it gets filled when the server sends us values
 		self.AdvBone_BoneManips = self.AdvBone_BoneManips or {}
+		//Tell the server to send us all the advbone manips along with our first boneinfo table
+		self.AdvBone_BoneManips_ShouldGet = true
 
 		//Store hitbox bounds by bone; we use these to help with renderbounds
 		self.AdvBone_BoneHitBoxes = {}
