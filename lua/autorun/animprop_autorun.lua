@@ -503,19 +503,12 @@ if CLIENT then
 		if g_ContextMenu and g_ContextMenu:IsVisible() then
 			for _, window in pairs(animpropwindows) do
 				if window.Control and window.Control.TabPanel and window.Control.TabPanel:GetActiveTab():GetText() == "Remapping" then
-
 					local ent = window.Control.m_Entity
 					if IsValid(ent) then
 						local ent2 = ent:GetPuppeteer()
 						if IsValid(ent2) then
-
 							local back = window.Control.Remapping
 							if back and back.BoneList then
-								local id1 = back.BoneList.selectedbone
-								local id2 = -1
-								local targetbonestr = ent.RemapInfo[id1].parent
-								if targetbonestr != "" then id2 = ent2:LookupBone(targetbonestr) end
-
 								local function DrawBonePos(_ent, id)
 									local _pos = nil
 									local matr = _ent:GetBoneMatrix(id)
@@ -534,15 +527,18 @@ if CLIENT then
 									draw.RoundedBox(0,_pos.x - 1,_pos.y - 1,2,2,Color(255,255,255,255))
 									draw.SimpleTextOutlined(_name,"Default",textpos.x,textpos.y,Color(255,255,255,255),TEXT_ALIGN_LEFT,TEXT_ALIGN_BOTTOM,1,Color(0,0,0,255))
 								end
-								DrawBonePos(ent, id1)
-								if id2 != -1 then
-									DrawBonePos(ent2, id2)
+
+								for _, line in pairs (back.BoneList:GetSelected()) do
+									DrawBonePos(ent, line.id)
+
+									local id2 = -1
+									local targetbonestr = ent.RemapInfo[line.id].parent
+									if targetbonestr != "" then id2 = ent2:LookupBone(targetbonestr) end
+									if id2 != -1 then DrawBonePos(ent2, id2) end
 								end
 							end
-
 						end
 					end
-
 				end
 			end
 		end

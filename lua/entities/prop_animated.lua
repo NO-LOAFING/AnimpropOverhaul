@@ -3531,38 +3531,60 @@ if SERVER then
 				net.WriteInt(key, 9)
 
 				net.WriteInt(ent:GetPuppeteer():LookupBone(entry.parent) or -1, 9)
-				net.WriteAngle(entry.ang)
+				net.WriteFloat(entry.ang.p) //send 3 floats instead of a vector, because net.WriteAngle clobbers precise values;
+				net.WriteFloat(entry.ang.y) //not sure if this is as necessary for angles as it is for vectors, but let's be safe here
+				net.WriteFloat(entry.ang.r)
 			end
 		net.Send(ply)
 	end)
 
 
-	//If we received remapinfo from the client (for one specific bone, sent by using the editor window), then apply it to the table
+	//If we received remapinfo from the client (sent by using the editor window), then apply it to the table
 	net.Receive("AnimProp_RemapInfoFromEditor_SendToSv", function(_, ply)
 		local ent = net.ReadEntity()
-		local entbone = net.ReadInt(9)
+		local boneids_read = {}
+		for i = 1, net.ReadInt(9) do
+			boneids_read[i] = net.ReadInt(9)
+		end
+		local which = net.ReadUInt(2)
 
-		local newtargetbone = net.ReadInt(9)
-		local newang = net.ReadAngle()
-
+		local val
+		if which == 0 then //target bone
+			val = net.ReadInt(9)
+		else //ang axis slider
+			val = net.ReadFloat()
+		end
 		local demofix = net.ReadBool()
 
-		if IsValid(ent) and ent:GetClass() == "prop_animated" and IsValid(ent:GetPuppeteer()) and ent.RemapInfo and ent.RemapInfo[entbone] then
-			if newtargetbone != -1 then
-				ent.RemapInfo[entbone].parent = ent:GetPuppeteer():GetBoneName(newtargetbone)
-			else
-				ent.RemapInfo[entbone].parent = ""
+		if IsValid(ent) and #boneids_read > 0 and ent:GetClass() == "prop_animated" and IsValid(ent:GetPuppeteer()) and ent.RemapInfo then
+			local did_remapinfo = false
+			for k, entbone in pairs (boneids_read) do
+				if ent.RemapInfo[entbone] then
+					if which == 0 then //target bone
+						if val != -2 then
+							if newtargetbone != -1 then
+								ent.RemapInfo[entbone].parent = ent:GetPuppeteer():GetBoneName(val)
+							else
+								ent.RemapInfo[entbone].parent = ""
+							end
+							did_remapinfo = true
+						end
+					else //ang axis slider
+						ent.RemapInfo[entbone].ang[which] = val
+						did_remapinfo = true
+					end
+				end
 			end
 
-			ent.RemapInfo[entbone].ang = newang
-
-			//Tell all the other clients that they need to update their RemapInfo tables to receive the changes (the original client already has the changes applied)
-			local filter = RecipientFilter()
-			filter:AddAllPlayers()
-			if !demofix then filter:RemovePlayer(ply) end //Fix for demo recording - demos don't record remapinfo changes made by the editor window, but they DO record network activity, so if ply was recording a demo, then send them a table update too
-			net.Start("AnimProp_RemapInfoTableUpdate_SendToCl")
-				net.WriteEntity(ent)
-			net.Send(filter)
+			if did_remapinfo then
+				//Tell all the other clients that they need to update their RemapInfo tables to receive the changes (the original client already has the changes applied)
+				local filter = RecipientFilter()
+				filter:AddAllPlayers()
+				if !demofix then filter:RemovePlayer(ply) end //Fix for demo recording - demos don't record remapinfo changes made by the editor window, but they DO record network activity, so if ply was recording a demo, then send them a table update too
+				net.Start("AnimProp_RemapInfoTableUpdate_SendToCl")
+					net.WriteEntity(ent)
+				net.Send(filter)
+			end
 		end
 	end)
 
@@ -3594,7 +3616,7 @@ else
 
 			tab[key] = {
 				parent = parentstr,
-				ang = net.ReadAngle(),
+				ang = Angle(net.ReadFloat(), net.ReadFloat(), net.ReadFloat()),
 			}
 		end
 

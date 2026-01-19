@@ -1519,39 +1519,64 @@ function PANEL:RebuildControls(tab, d, d2, d3)
 
 	if IsValid(ent2) then
 
-		local function SendRemapInfoToServer()
-			local entbone = back.BoneList.selectedbone
+		local function SendRemapInfoToServer(which)
+			local boneids = back.BoneList:GetSelected()
 
-			local newtargetbone = back.TargetBoneList.selectedtargetbone
-			local newang = Angle( back.slider_ang_p:GetValue(), back.slider_ang_y:GetValue(), back.slider_ang_r:GetValue() )
+			local whichtab = {
+				[back.TargetBoneList] = 0,
+				[back.slider_ang_p] = 1,
+				[back.slider_ang_y] = 2,
+				[back.slider_ang_r] = 3,
+			}
+			if whichtab[which] == nil then return end
 
-			//First, apply the new RemapInfo clientside
-			if !back.BoneList.UpdatingRemapOptions then
-				if newtargetbone != -1 then
-					ent.RemapInfo[entbone].parent = ent2:GetBoneName(newtargetbone)
-				else
-					ent.RemapInfo[entbone].parent = ""
+			if back.BoneList.UpdatingRemapOptions or #boneids == 0 then return end
+
+			//Send all of the information to the server so the duplicator can pick it up
+			net.Start("AnimProp_RemapInfoFromEditor_SendToSv")
+				net.WriteEntity(ent)
+				net.WriteInt(#boneids, 9)
+				for k, line in pairs (boneids) do
+					net.WriteInt(line.id, 9)
 				end
+				net.WriteUInt(whichtab[which], 2)
 
-				ent.RemapInfo[entbone].ang = newang
-
+				if which == back.TargetBoneList then
+					local newtargetbone = back.TargetBoneList.selectedtargetbone
+					//First, apply the new RemapInfo clientside
+					if ent.RemapInfo and newtargetbone != -2 then
+						for k, line in pairs (boneids) do
+							if ent.RemapInfo[line.id] then
+								if newtargetbone != -1 then
+									ent.RemapInfo[line.id].parent = ent2:GetBoneName(newtargetbone)
+								else
+									ent.RemapInfo[line.id].parent = ""
+								end
+							end
+						end
+					end
+					//Then send the new value to the server
+					net.WriteInt(newtargetbone, 9)
+				else
+					//The rest are all angle sliders
+					local val = which:GetValue()
+					//First, apply the new RemapInfo clientside
+					if ent.RemapInfo then
+						for k, line in pairs (boneids) do
+							if ent.RemapInfo[line.id] then
+								ent.RemapInfo[line.id].ang[whichtab[which]] = val
+							end
+						end
+					end
+					//Then send the new value to the server
+					net.WriteFloat(val)
+				end
+				net.WriteBool(engine.IsRecordingDemo())
 
 				//Wake up BuildBonePositions and get it to use the new info
 				ent.RemapInfo_RemapAngOffsets = nil
 				ent.LastBoneChangeTime = CurTime()
-
-
-				//Then, send all of the information to the server so the duplicator can pick it up
-				net.Start("AnimProp_RemapInfoFromEditor_SendToSv")
-					net.WriteEntity(ent)
-					net.WriteInt(entbone, 9)
-
-					net.WriteInt(newtargetbone, 9)
-					net.WriteAngle(newang)
-
-					net.WriteBool(engine.IsRecordingDemo())
-				net.SendToServer()
-			end
+			net.SendToServer()
 		end
 
 
@@ -1564,17 +1589,17 @@ function PANEL:RebuildControls(tab, d, d2, d3)
 		back.BoneList = list
 		list:AddColumn("Bone (" .. string.GetFileFromFilename(ent:GetModel()) .. ")")
 		list:Dock(FILL)
-		list:SetMultiSelect(false)
+		list:SetMultiSelect(true)
 
 		ent:SetupBones()
 		ent:InvalidateBoneCache()
 
 		list.Bones = {}
-		list.selectedbone = 0
 		for id = 0, ent:GetBoneCount() do
 			if ent:GetBoneName(id) != "__INVALIDBONE__" then
 				local line = list:AddLine(ent:GetBoneName(id))
 				list.Bones[id] = line
+				line.id = id
 
 				local selectedtargetbone = -1
 				if ent.RemapInfo and ent.RemapInfo[id] then
@@ -1582,11 +1607,6 @@ function PANEL:RebuildControls(tab, d, d2, d3)
 					if targetbonestr != "" then selectedtargetbone = ent2:LookupBone(targetbonestr) end
 				end
 				if selectedtargetbone != -1 then line.HasTargetBone = true end
-
-				line.OnSelect = function()
-					list.selectedbone = id
-					list.UpdateRemapOptions(id)
-				end
 
 				//Select bone 0 by default
 				if id == 0 then
@@ -1623,13 +1643,27 @@ function PANEL:RebuildControls(tab, d, d2, d3)
 				img:Dock(RIGHT)
 			end
 		end
+		list.OnRowSelected = function()
+			list.UpdateRemapOptions()
+		end
 
 		list.UpdatingRemapOptions = false
-		list.UpdateRemapOptions = function(boneid)
+		list.UpdateRemapOptions = function()
 			//Don't let the options accidentally update anything while we're changing their values like this
 			list.UpdatingRemapOptions = true
 
-			local ang = ent.RemapInfo[boneid].ang
+			local boneids = back.BoneList:GetSelected()
+			//MsgN("running UpdateRemapOptions with selected bones: ")
+			//PrintTable(boneids)
+
+			local ang, ang_conflict_p, ang_conflict_y, ang_conflict_r
+			for k, line in pairs (boneids) do
+				local this_ang = ent.RemapInfo[line.id].ang
+				ang = ang or this_ang
+				if ang.p != this_ang.p then ang_conflict_p = true end
+				if ang.y != this_ang.y then ang_conflict_y = true end
+				if ang.r != this_ang.r then ang_conflict_r = true end
+			end
 
 			//if the keyboard focus is on a slider's text field when we update the slider's value, then the text value won't update correctly,
 			//so make sure to take the focus off of the text fields first
@@ -1641,20 +1675,48 @@ function PANEL:RebuildControls(tab, d, d2, d3)
 			back.slider_ang_y:SetValue(ang.y)
 			back.slider_ang_r:SetValue(ang.r)
 
-			//taking the focus off of the text areas isn't enough, we also need to update their text manually because vgui.GetKeyboardFocus()
-			//erroneously tells them that they've still got focus and shouldn't be updating themselves
-			back.slider_ang_p.TextArea:SetText( back.slider_ang_p.Scratch:GetTextValue() )
-			back.slider_ang_y.TextArea:SetText( back.slider_ang_y.Scratch:GetTextValue() )
-			back.slider_ang_r.TextArea:SetText( back.slider_ang_r.Scratch:GetTextValue() )
-
-			local bonename = ent.RemapInfo[boneid].parent
-			if ent2:LookupBone(bonename) then
-				back.TargetBoneList:SetValue(bonename)
-				back.TargetBoneList.selectedtargetbone = ent2:LookupBone(bonename)
+			if !ang_conflict_p then
+				//taking the focus off of the text areas isn't enough, we also need to update their text manually because vgui.GetKeyboardFocus()
+				//erroneously tells them that they've still got focus and shouldn't be updating themselves
+				back.slider_ang_p.TextArea:SetText(back.slider_ang_p.Scratch:GetTextValue())
 			else
-				back.TargetBoneList:SetValue("(none)")
-				back.TargetBoneList.selectedtargetbone = -1
+				//we've selected multiple bones with conflicting values, don't show any number until this changes
+				back.slider_ang_p.TextArea:SetText("")
 			end
+			if !ang_conflict_y then
+				back.slider_ang_y.TextArea:SetText(back.slider_ang_y.Scratch:GetTextValue())
+			else
+				back.slider_ang_y.TextArea:SetText("")
+			end
+			if !ang_conflict_r then
+				back.slider_ang_r.TextArea:SetText(back.slider_ang_r.Scratch:GetTextValue())
+			else
+				back.slider_ang_r.TextArea:SetText("")
+			end
+
+			local selectedtargetbone
+			for k, line in pairs (boneids) do
+				local this_targetbone = ent.RemapInfo[line.id].parent
+				if this_targetbone != "" and IsValid(ent2) then 
+					this_targetbone = ent2:LookupBone(this_targetbone)
+				else
+					this_targetbone = -1
+				end
+				selectedtargetbone = selectedtargetbone or this_targetbone
+				if selectedtargetbone != this_targetbone then
+					selectedtargetbone = -2
+					break
+				end
+			end
+			selectedtargetbone = selectedtargetbone or -2
+			if selectedtargetbone == -2 then
+				back.TargetBoneList:SetValue("")
+			elseif selectedtargetbone == -1 then
+				back.TargetBoneList:SetValue("(none)")
+			else
+				back.TargetBoneList:SetValue(ent2:GetBoneName(selectedtargetbone))
+			end
+			back.TargetBoneList.selectedtargetbone = selectedtargetbone
 
 			list.UpdatingRemapOptions = false
 		end
@@ -1691,7 +1753,7 @@ function PANEL:RebuildControls(tab, d, d2, d3)
 			text:SetWrap(true)
 			text:SetTextInset(0, 0)
 			//text:SetText("To set up remapping, use the angle options above to make the prop's default pose match the puppeteer's default pose as closely as possible, and then make sure the bones you want to animate have target bones set (green checkmarks).")
-			text:SetText("To set up remapping, both models' default poses need to match as closely as possible. To adjust the pose, select a bone in the list to the left, and then use the angle options below to rotate it.")
+			text:SetText("To set up remapping, both models' default poses need to match as closely as possible. To adjust the pose, select bones in the list to the left, and then use the angle options below to rotate them.")
 			text:SetContentAlignment(5)
 			text:SetAutoStretchVertical(true)
 			text:DockMargin(padding,padding-3,padding,0) //-3 height on text because it has a little extra bloat on top
@@ -1712,7 +1774,6 @@ function PANEL:RebuildControls(tab, d, d2, d3)
 
 			drop.Combo = vgui.Create("DComboBox", drop)
 			back.TargetBoneList = drop.Combo
-			
 			drop.Combo:SetHeight(25)
 			drop.Combo:Dock(FILL)
 
@@ -1728,11 +1789,13 @@ function PANEL:RebuildControls(tab, d, d2, d3)
 
 			drop.Combo.OnSelect = function(_,_,value,data)
 				drop.Combo.selectedtargetbone = data
-				SendRemapInfoToServer()
+				SendRemapInfoToServer(back.TargetBoneList)
 
-				//Update visuals of list entry for this bone
-				if back.BoneList.Bones[back.BoneList.selectedbone] then
-					back.BoneList.Bones[back.BoneList.selectedbone].HasTargetBone = data != -1
+				//Update visuals of list entries to show their new status
+				for k, line in pairs (back.BoneList:GetSelected()) do
+					if back.BoneList.Bones[line.id] then
+						back.BoneList.Bones[line.id].HasTargetBone = data != -1
+					end
 				end
 			end
 
@@ -1791,34 +1854,37 @@ function PANEL:RebuildControls(tab, d, d2, d3)
 			slider:SetText("Angle Pitch")
 			slider:SetMinMax(-180, 180)
 			slider:SetDefaultValue(0.00)
+			slider:SetDecimals(3)
 			slider:SetDark(true)
 			slider:SetHeight(18)//(9)
 			slider:Dock(TOP)
 			slider:DockMargin(padding,betweenitems,0,0)
-			slider.OnValueChanged = function() SendRemapInfoToServer() end
 			back.slider_ang_p = slider
+			slider.OnValueChanged = function() SendRemapInfoToServer(back.slider_ang_p) end
 
 			local slider = vgui.Create("DNumSlider", rpnl)
 			slider:SetText("Angle Yaw")
 			slider:SetMinMax(-180, 180)
 			slider:SetDefaultValue(0.00)
+			slider:SetDecimals(3)
 			slider:SetDark(true)
 			slider:SetHeight(18)//(9)
 			slider:Dock(TOP)
 			slider:DockMargin(padding,betweenitems-5,0,0)
-			slider.OnValueChanged = function() SendRemapInfoToServer() end
 			back.slider_ang_y = slider
+			slider.OnValueChanged = function() SendRemapInfoToServer(back.slider_ang_y) end
 
 			local slider = vgui.Create("DNumSlider", rpnl)
 			slider:SetText("Angle Roll")
 			slider:SetMinMax(-180, 180)
 			slider:SetDefaultValue(0.00)
+			slider:SetDecimals(3)
 			slider:SetDark(true)
 			slider:SetHeight(18)//(9)
 			slider:Dock(TOP)
 			slider:DockMargin(padding,betweenitems-5,0,3)
-			slider.OnValueChanged = function() SendRemapInfoToServer() end
 			back.slider_ang_r = slider
+			slider.OnValueChanged = function() SendRemapInfoToServer(back.slider_ang_r) end
 
 			local help = vgui.Create("DLabel", rpnl)
 			help:SetDark(true)
@@ -1928,7 +1994,7 @@ function PANEL:RebuildControls(tab, d, d2, d3)
 			help:SetDark(true)
 			help:SetWrap(true)
 			help:SetTextInset(0, 0)
-			help:SetText("These options are purely visual and won't affect remapping.") //bad wording
+			help:SetText("These options are only for previewing the puppeteer, and won't affect the animation.")
 			help:SetContentAlignment(5)
 			help:SetAutoStretchVertical(true)
 			//help:DockMargin(32,0,32,8)
@@ -1993,7 +2059,7 @@ function PANEL:RebuildControls(tab, d, d2, d3)
 		back:SizeToChildren(false, true)
 		back:DockPadding(0,0,0,0)
 
-		back.BoneList.UpdateRemapOptions(0)
+		back.BoneList.UpdateRemapOptions() //bone 0 already starts off selected, just give it a nudge
 
 	end
 
