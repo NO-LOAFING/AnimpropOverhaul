@@ -2320,8 +2320,8 @@ if CLIENT then
 				//net.WriteUInt(table.Count(physvel), 9) //this is always the same number as tab so we dont have to send it again
 				for bone, tab in pairs (physvel) do
 					net.WriteUInt(bone, 9)
-					net.WriteVector(tab.vel)
-					net.WriteVector(tab.angVel)
+					net.WriteVector(tab.vel or vector_origin)
+					net.WriteVector(tab.angVel or vector_origin) //one user reported an error caused by this value being nil somehow. can't figure out what conditions cause this issue (quaternion func above returning nil?) but it's easy enough to make a fallback for.
 				end
 			end
 
