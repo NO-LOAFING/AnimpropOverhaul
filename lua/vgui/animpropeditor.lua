@@ -1590,16 +1590,26 @@ function PANEL:RebuildControls(tab, d, d2, d3)
 		list:AddColumn("Bone (" .. string.GetFileFromFilename(ent:GetModel()) .. ")")
 		list:Dock(FILL)
 		list:SetMultiSelect(true)
-
-		ent:SetupBones()
-		ent:InvalidateBoneCache()
-
 		list.Bones = {}
-		for id = 0, ent:GetBoneCount() do
-			if ent:GetBoneName(id) != "__INVALIDBONE__" then
-				local line = list:AddLine(ent:GetBoneName(id))
+
+		local cv_linkicons = GetConVar("cl_animprop_editor_bone_linkicons")
+
+		list.PopulateBoneList = function()
+
+			list:Clear()
+			list:ClearSelection() //TODO: is this unnecessary?
+
+			ent:SetupBones()
+			ent:InvalidateBoneCache()
+
+			list.Bones = {}
+
+			local function AddBone(name, id)
+				local line = list:AddLine(name)
 				list.Bones[id] = line
 				line.id = id
+				line:SetTooltip(string.TrimLeft(name))
+				line:SetTooltipDelay(0)
 
 				local selectedtargetbone = -1
 				if ent.RemapInfo and ent.RemapInfo[id] then
@@ -1608,41 +1618,74 @@ function PANEL:RebuildControls(tab, d, d2, d3)
 				end
 				if selectedtargetbone != -1 then line.HasTargetBone = true end
 
-				//Select bone 0 by default
-				if id == 0 then
-					line:SetSelected(true) //TODO: what if bone 0 is invalid somehow?
-				end
-
 				line.Paint = function(self, w, h)
 					derma.SkinHook("Paint", "ListViewLine", self, w, h)
 					if line.HasTargetBone then
-						if self.Icon then
-							self.Icon:SetImage("icon16/tick.png")
-						end
-  						surface.SetDrawColor(0,255,0,35)
+						AnimProp_BoneList_IconTick = AnimProp_BoneList_IconTick or Material("icon16/tick.png")
+						icon = AnimProp_BoneList_IconTick
+						surface.SetDrawColor(0,255,0,35)
 					else
-						if self.Icon then
-							self.Icon:SetImage("icon16/cross.png")
-						end
-					  	surface.SetDrawColor(255,0,0,35)
+						AnimProp_BoneList_IconCross = AnimProp_BoneList_IconCross or Material("icon16/cross.png")
+						icon = AnimProp_BoneList_IconCross
+						surface.SetDrawColor(255,0,0,35)
 					end
-    					surface.DrawRect(0, 0, w, h)
+					surface.DrawRect(0, 0, w, h)
+					if cv_linkicons:GetBool() then //these are mostly unnecessary because the line is already colored red/green, but could be useful for colorblindness i suppose, so gate them behind a convar
+						surface.SetDrawColor(255,255,255,255)
+						surface.SetMaterial(icon)
+						local x = w - 16
+						if list.VBar.Enabled then x = x - list.VBar:GetWide() end
+						surface.DrawTexturedRect(x, (h-16)/2, 16, 16)
+						surface.SetDrawColor(255,255,255,(255*0.75))
+						AnimProp_BoneList_IconLink = AnimProp_BoneList_IconLink or Material("icon16/link.png")
+						surface.SetMaterial(AnimProp_BoneList_IconLink)
+						surface.DrawTexturedRect(x, (h-16)/2, 16, 16)
+					end
 				end
-
-				local img = vgui.Create("DImage", line)
-				line.Icon = img
-				img:SetImage("icon16/cross.png")
-				img:SizeToContents()
-				img:Dock(RIGHT)
-				img:DockMargin(0,0,list.VBar:GetWide(),0) //not worth the trouble making this adjust for whether the vbar is visible or not
-
-				local img = vgui.Create("DImage", line)
-				line.Icon2 = img
-				img:SetImage("icon16/link.png")
-				img:SizeToContents()
-				img:Dock(RIGHT)
 			end
+
+			if !GetConVar("cl_animprop_editor_bone_hierarchy"):GetBool() then
+				for id = 0, ent:GetBoneCount() do
+					local name = ent:GetBoneName(id)
+					if name != "__INVALIDBONE__" then
+						if GetConVar("cl_animprop_editor_bone_ids"):GetBool() then name = id .. ": " .. name end
+						AddBone(name, id)
+					end
+				end
+			else
+				local function AddBonesInHierarchy(id, lvl)
+					local indent = ""
+					for i = 1, lvl do
+						indent = indent .. "  "
+					end
+					local name = ent:GetBoneName(id)
+					if name != "__INVALIDBONE__" then
+						if GetConVar("cl_animprop_editor_bone_ids"):GetBool() then name = id .. ": " .. name end
+						AddBone(indent .. name, id)
+
+						for _, v in ipairs (ent:GetChildBones(id)) do
+							AddBonesInHierarchy(v, lvl + 1)
+						end
+					end
+				end
+				for id = 0, ent:GetBoneCount() - 1 do
+					local id2 = ent:GetBoneParent(id) 
+					if id2 == nil or id2 < 0 then
+						AddBonesInHierarchy(id, 0)
+					end
+				end
+			end
+
+			list:SelectFirstItem()
+			list.UpdateRemapOptions()
+
+			//indents and id numbers both completely break alphabetical sorting; this wasn't even 
+			//an intended feature at all, but i'm not turning it off completely because you just 
+			//know there's *someone* out there who's made it an integral part of their workflow.
+			list:SetSortable(!GetConVar("cl_animprop_editor_bone_hierarchy"):GetBool() and !GetConVar("cl_animprop_editor_bone_ids"):GetBool())
+		
 		end
+
 		list.OnRowSelected = function()
 			list.UpdateRemapOptions()
 		end
@@ -1694,29 +1737,7 @@ function PANEL:RebuildControls(tab, d, d2, d3)
 				back.slider_ang_r.TextArea:SetText("")
 			end
 
-			local selectedtargetbone
-			for k, line in pairs (boneids) do
-				local this_targetbone = ent.RemapInfo[line.id].parent
-				if this_targetbone != "" and IsValid(ent2) then 
-					this_targetbone = ent2:LookupBone(this_targetbone)
-				else
-					this_targetbone = -1
-				end
-				selectedtargetbone = selectedtargetbone or this_targetbone
-				if selectedtargetbone != this_targetbone then
-					selectedtargetbone = -2
-					break
-				end
-			end
-			selectedtargetbone = selectedtargetbone or -2
-			if selectedtargetbone == -2 then
-				back.TargetBoneList:SetValue("")
-			elseif selectedtargetbone == -1 then
-				back.TargetBoneList:SetValue("(none)")
-			else
-				back.TargetBoneList:SetValue(ent2:GetBoneName(selectedtargetbone))
-			end
-			back.TargetBoneList.selectedtargetbone = selectedtargetbone
+			back.TargetBoneList.PopulateTargetBoneList()
 
 			list.UpdatingRemapOptions = false
 		end
@@ -1777,14 +1798,64 @@ function PANEL:RebuildControls(tab, d, d2, d3)
 			drop.Combo:SetHeight(25)
 			drop.Combo:Dock(FILL)
 
-			ent2:SetupBones()
-			ent2:InvalidateBoneCache()
+			back.TargetBoneList.PopulateTargetBoneList = function()
 
-			drop.Combo:AddChoice("(none)", -1)
-			for id = 0, ent2:GetBoneCount() do
-				if ent2:GetBoneName(id) != "__INVALIDBONE__" then
-					drop.Combo:AddChoice(ent2:GetBoneName(id), id)
+				local boneids = back.BoneList:GetSelected()
+				back.TargetBoneList:Clear()
+
+				ent2:SetupBones()
+				ent2:InvalidateBoneCache()
+
+				local selectedtargetbone
+				for k, line in pairs (boneids) do
+					local this_targetbone = ent.RemapInfo[line.id].parent
+					if this_targetbone != "" and IsValid(ent2) then 
+						this_targetbone = ent2:LookupBone(this_targetbone)
+					else
+						this_targetbone = -1
+					end
+					selectedtargetbone = selectedtargetbone or this_targetbone
+					if selectedtargetbone != this_targetbone then
+						selectedtargetbone = -2
+						break
+					end
 				end
+				selectedtargetbone = selectedtargetbone or -2
+				back.TargetBoneList.selectedtargetbone = selectedtargetbone
+
+				drop.Combo:AddChoice("(none)", -1, (selectedtargetbone == -1))
+				if !GetConVar("cl_animprop_editor_bone_hierarchy"):GetBool() then
+					for id = 0, ent2:GetBoneCount() - 1 do
+						local name = ent2:GetBoneName(id)
+						if name != "__INVALIDBONE__" then
+							if GetConVar("cl_animprop_editor_bone_ids"):GetBool() then name = id .. ": " .. name end
+							drop.Combo:AddChoice(name, id, (selectedtargetbone == id))
+						end
+					end
+				else
+					local function AddBonesInHierarchy(id, lvl)
+						local indent = ""
+						for i = 1, lvl do
+							indent = indent .. "  "
+						end
+						local name = ent2:GetBoneName(id)
+						if name != "__INVALIDBONE__" then
+							if GetConVar("cl_animprop_editor_bone_ids"):GetBool() then name = id .. ": " .. name end
+							drop.Combo:AddChoice(indent .. name, id, (selectedtargetbone == id))
+
+							for _, v in ipairs (ent2:GetChildBones(id)) do
+								AddBonesInHierarchy(v, lvl + 1)
+							end
+						end
+					end
+					for id = 0, ent2:GetBoneCount() - 1 do
+						local id2 = ent2:GetBoneParent(id) 
+						if id2 == nil or id2 < 0 then
+							AddBonesInHierarchy(id, 0)
+						end
+					end
+				end
+
 			end
 
 			drop.Combo.OnSelect = function(_,_,value,data)
@@ -1797,9 +1868,13 @@ function PANEL:RebuildControls(tab, d, d2, d3)
 						back.BoneList.Bones[line.id].HasTargetBone = data != -1
 					end
 				end
-			end
 
-			//Modified OpenMenu fuction to display menu items in bone ID (data value) order
+				//Don't show indents in selected bone name
+				drop.Combo:SetText(string.TrimLeft(value))
+			end
+			drop.Combo:SetSortItems(false)
+
+			//Modified OpenMenu fuction to check the currently selected bone
 			drop.Combo.OpenMenu = function(self, pControlOpener)
 				if ( pControlOpener && pControlOpener == self.TextEntry ) then
 					return
@@ -1817,11 +1892,10 @@ function PANEL:RebuildControls(tab, d, d2, d3)
 
 				self.Menu = DermaMenu( false, self )
 
-
-
-				for k, v in SortedPairs( self.Choices ) do
+				//only this block is meaningfully changed
+				for k, v in pairs(self.Choices) do
 					local option = self.Menu:AddOption( v, function() self:ChooseOption( v, k ) end )
-					if back.TargetBoneList.selectedtargetbone == (k - 2) then option:SetChecked(true) end  //check the currently selected target bone
+					if back.TargetBoneList.selectedtargetbone == self.Data[k] then option:SetChecked(true) end  //check the currently selected target bone
 				end
 
 				local x, y = self:LocalToScreen( 0, self:GetTall() )
@@ -2002,6 +2076,48 @@ function PANEL:RebuildControls(tab, d, d2, d3)
 			help:Dock(TOP)
 			help:SetTextColor(color_helpdark)
 
+			local function BonelistUpdateAppearance()
+				//Compile a list of all currently selected bones that will persist after the update
+				local tab = {}
+				for k, line in pairs (back.BoneList:GetSelected()) do
+					tab[line.id] = true
+				end
+				//Update the bonelist, to change the order the bones are displayed in and/or update their display names
+				back.BoneList.PopulateBoneList()
+				//Now restore the selected bones
+				back.BoneList:ClearSelection()
+				for k, line in pairs (back.BoneList:GetLines()) do
+					if tab[line.id] then back.BoneList:SelectItem(line) end
+				end
+			end
+
+			local check = vgui.Create( "DCheckBoxLabel", rpnl)
+			check:SetText("Display bone list as hierarchy")
+			check:SetDark(true)
+			check:SetHeight(15)
+			check:Dock(TOP)
+			check:DockMargin(padding,betweenitems*2,0,0)
+			check:SetConVar("cl_animprop_editor_bone_hierarchy")
+			check.OnChange = BonelistUpdateAppearance
+
+			local check = vgui.Create( "DCheckBoxLabel", rpnl)
+			check:SetText("Show bone ID numbers")
+			check:SetDark(true)
+			check:SetHeight(15)
+			check:Dock(TOP)
+			check:DockMargin(padding,betweenitems,0,0)
+			check:SetConVar("cl_animprop_editor_bone_ids")
+			check.OnChange = BonelistUpdateAppearance
+			//TODO: see if we need to do SetValue for these, even though they're doing SetConVar
+
+			local check = vgui.Create( "DCheckBoxLabel", rpnl)
+			check:SetText("Show icons for linked/unlinked bones")
+			check:SetDark(true)
+			check:SetHeight(15)
+			check:Dock(TOP)
+			check:DockMargin(padding,betweenitems,0,0)
+			check:SetConVar("cl_animprop_editor_bone_linkicons")
+
 
 
 		//dummy category to fix bug where lowest category has broken lower padding
@@ -2059,7 +2175,7 @@ function PANEL:RebuildControls(tab, d, d2, d3)
 		back:SizeToChildren(false, true)
 		back:DockPadding(0,0,0,0)
 
-		back.BoneList.UpdateRemapOptions() //bone 0 already starts off selected, just give it a nudge
+		back.BoneList.PopulateBoneList()
 
 	end
 
