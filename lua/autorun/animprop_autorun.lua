@@ -502,6 +502,10 @@ end
 //Draw name and position of selected bones if editor window's remapping tab is open
 //And the award for ugliest nested "if x then" checks goes to...
 if CLIENT then
+	local colorborder = Color(0,0,0,255)
+	local colorselect = Color(0,255,0,255)
+	local colorunselect = Color(255,255,255,255)
+
 	hook.Add("HUDPaint", "AnimProp_HUDPaint_DrawRemappingBones", function()
 		if g_ContextMenu and g_ContextMenu:IsVisible() then
 			for _, window in pairs(animpropwindows) do
@@ -512,7 +516,7 @@ if CLIENT then
 						if IsValid(ent2) then
 							local back = window.Control.Remapping
 							if back and back.BoneList then
-								local function DrawBonePos(_ent, id)
+								local function DrawBonePos(_ent, id, selected)
 									local _pos = nil
 									local matr = _ent:GetBoneMatrix(id)
 									if matr then 
@@ -526,18 +530,32 @@ if CLIENT then
 									local _pos = _pos:ToScreen()
 									local textpos = {x = _pos.x+5,y = _pos.y-5}
 
-									draw.RoundedBox(0,_pos.x - 2,_pos.y - 2,4,4,Color(0,0,0,255))
-									draw.RoundedBox(0,_pos.x - 1,_pos.y - 1,2,2,Color(255,255,255,255))
-									draw.SimpleTextOutlined(_name,"Default",textpos.x,textpos.y,Color(255,255,255,255),TEXT_ALIGN_LEFT,TEXT_ALIGN_BOTTOM,1,Color(0,0,0,255))
+									if selected then
+										draw.RoundedBox(0,_pos.x - 3,_pos.y - 3,6,6,colorborder)
+										draw.RoundedBox(0,_pos.x - 1,_pos.y - 1,2,2,colorselect)
+										draw.SimpleTextOutlined(_name,"Default",textpos.x,textpos.y,colorselect,TEXT_ALIGN_LEFT,TEXT_ALIGN_BOTTOM,2,colorborder)
+									else
+										draw.RoundedBox(0,_pos.x - 2,_pos.y - 2,4,4,colorborder)
+										draw.RoundedBox(0,_pos.x - 1,_pos.y - 1,2,2,colorunselect)
+										draw.SimpleTextOutlined(_name,"Default",textpos.x,textpos.y,colorunselect,TEXT_ALIGN_LEFT,TEXT_ALIGN_BOTTOM,1,colorborder)
+									end
 								end
 
+								//If we're hovering over an unselected bone in the bonelist or targetbonelist, draw 
+								//its name and position; do this first so that the selected bones draw on top of it
+								local hov = vgui:GetHoveredPanel()
+								if IsValid(hov) and istable(hov.AnimProp_BoneHoverData) and IsValid(hov.AnimProp_BoneHoverData.ent) then
+									DrawBonePos(hov.AnimProp_BoneHoverData.ent, hov.AnimProp_BoneHoverData.id, false)
+								end
+
+								//Draw the name and position of all bones currently selected in the bonelist
 								for _, line in pairs (back.BoneList:GetSelected()) do
-									DrawBonePos(ent, line.id)
+									DrawBonePos(ent, line.id, true)
 
 									local id2 = -1
 									local targetbonestr = ent.RemapInfo[line.id].parent
 									if targetbonestr != "" then id2 = ent2:LookupBone(targetbonestr) end
-									if id2 != -1 then DrawBonePos(ent2, id2) end
+									if id2 != -1 then DrawBonePos(ent2, id2, true) end
 								end
 							end
 						end

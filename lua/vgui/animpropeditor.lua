@@ -1608,6 +1608,10 @@ function PANEL:RebuildControls(tab, d, d2, d3)
 				local line = list:AddLine(name)
 				list.Bones[id] = line
 				line.id = id
+				line.AnimProp_BoneHoverData = { //info for on-hover check in HUDPaint
+					id = id,
+					ent = ent
+				}
 				line:SetTooltip(string.TrimLeft(name))
 				line:SetTooltipDelay(0)
 
@@ -1896,6 +1900,13 @@ function PANEL:RebuildControls(tab, d, d2, d3)
 				for k, v in pairs(self.Choices) do
 					local option = self.Menu:AddOption( v, function() self:ChooseOption( v, k ) end )
 					if back.TargetBoneList.selectedtargetbone == self.Data[k] then option:SetChecked(true) end  //check the currently selected target bone
+				
+					if self.Data[k] >= 0 then //don't show for "(none)" option
+						option.AnimProp_BoneHoverData = { //info for on-hover check in HUDPaint
+							id = self.Data[k],
+							ent = ent2
+						}
+					end
 				end
 
 				local x, y = self:LocalToScreen( 0, self:GetTall() )
