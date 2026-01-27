@@ -2353,7 +2353,6 @@ else
 	net.Receive("AnimProp_Ragdollize_SendToSv", function(_, ply)
 
 		local self = net.ReadEntity()
-		if !IsValid(self) or self:GetClass() != "prop_animated" then return end
 
 		local count = net.ReadUInt(9)
 		local tab = {}
@@ -2388,9 +2387,10 @@ else
 					angVel = net.ReadVector(),
 				}
 			end
-			self.PhysBoneVelocities = tab3
 		end
 
+		if !IsValid(self) or self:GetClass() != "prop_animated" then return end
+		if tab3 then self.PhysBoneVelocities = tab3 end
 		self:Ragdollize(ply, tab, tab2, allowresize)
 
 	end)
@@ -4623,15 +4623,18 @@ if SERVER then
 	util.AddNetworkString("AdvBone_ResetBoneChangeTime_SendToCl")
 
 	AdvBone_ResetBoneChangeTime = function(ent)
-		//Limit how often the server sends this to clients; i don't know of any obvious cases where this would happen a lot like AdvBone_ResetBoneChangeTimeOnChildren does from manips
-		//or stop motion helper, but let's be safe here
-		local time = CurTime()
-		ent.AdvBone_ResetBoneChangeTime_LastSent = ent.AdvBone_ResetBoneChangeTime_LastSent or 0
-		if time > ent.AdvBone_ResetBoneChangeTime_LastSent then
-			ent.AdvBone_ResetBoneChangeTime_LastSent = time
-			net.Start("AdvBone_ResetBoneChangeTime_SendToCl", true)
-				net.WriteEntity(ent)
-			net.Broadcast()
+		local class = ent:GetClass()
+		if class == "ent_advbonemerge" or class == "prop_animated" then
+			//Limit how often the server sends this to clients; i don't know of any obvious cases where this would happen a lot like AdvBone_ResetBoneChangeTimeOnChildren does from manips
+			//or stop motion helper, but let's be safe here
+			local time = CurTime()
+			ent.AdvBone_ResetBoneChangeTime_LastSent = ent.AdvBone_ResetBoneChangeTime_LastSent or 0
+			if time > ent.AdvBone_ResetBoneChangeTime_LastSent then
+				ent.AdvBone_ResetBoneChangeTime_LastSent = time
+				net.Start("AdvBone_ResetBoneChangeTime_SendToCl", true)
+					net.WriteEntity(ent)
+				net.Broadcast()
+			end
 		end
 	end
 
@@ -4640,7 +4643,10 @@ else
 	net.Receive("AdvBone_ResetBoneChangeTime_SendToCl", function()
 		local ent = net.ReadEntity()
 		if IsValid(ent) then
-			ent.LastBoneChangeTime = CurTime()
+			local class = ent:GetClass()
+			if class == "ent_advbonemerge" or class == "prop_animated" then
+				ent.LastBoneChangeTime = CurTime()
+			end
 		end
 	end)
 
@@ -4738,7 +4744,7 @@ if CLIENT then
 	net.Receive("AnimProp_EyeTargetLocal_SendToCl", function()
 		local ent = net.ReadEntity()
 		local vec = net.ReadVector()
-		if !IsValid(ent) then return end
+		if !IsValid(ent) or ent:GetClass() != "prop_animated" then return end
 		ent.EyeTargetLocal = vec
 	end)
 
