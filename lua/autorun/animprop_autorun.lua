@@ -25,7 +25,8 @@ else
 	CreateClientConVar("cl_animprop_editor_d", "200", true, false, "Position of the central divider in the animated prop editor's animation page", d_min, d_max) //^
 	CreateClientConVar("cl_animprop_editor_d2", "346", true, false, "Position of the central divider in the animated prop editor's poseparam page", d2_min, d2_max) //default is wide enough to snugly fit poseparam options
 	CreateClientConVar("cl_animprop_editor_d3", "200", true, false, "Position of the central divider in the animated prop editor's remapping page", d3_min, d3_max) //default is wide enough for bone and option names to be legible
-	CreateClientConVar("cl_animprop_editor_bone_hierarchy", "1", true, false, "Remapping controls: Display bone list as hierarchy", 0, 1)
+	CreateClientConVar("cl_animprop_editor_bone_multiselect", "0", true, false, "Remapping controls: Enable selecting multiple bones", 0, 1)
+	CreateClientConVar("cl_animprop_editor_bone_hierarchyview", "0", true, false, "Remapping controls: Display bone list as hierarchy", 0, 1)
 	CreateClientConVar("cl_animprop_editor_bone_ids", "1", true, false, "Remapping controls: Show bone ID numbers", 0, 1)
 	CreateClientConVar("cl_animprop_editor_bone_linkicons", "0", true, false, "Remapping controls: Show icons for linked/unlinked bones", 0, 1)
 

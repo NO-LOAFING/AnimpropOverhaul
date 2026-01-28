@@ -1589,7 +1589,6 @@ function PANEL:RebuildControls(tab, d, d2, d3)
 		back.BoneList = list
 		list:AddColumn("Bone (" .. string.GetFileFromFilename(ent:GetModel()) .. ")")
 		list:Dock(FILL)
-		list:SetMultiSelect(true)
 		list.Bones = {}
 
 		local cv_linkicons = GetConVar("cl_animprop_editor_bone_linkicons")
@@ -1598,6 +1597,7 @@ function PANEL:RebuildControls(tab, d, d2, d3)
 
 			list:Clear()
 			list:ClearSelection() //TODO: is this unnecessary?
+			list:SetMultiSelect(GetConVar("cl_animprop_editor_bone_multiselect"):GetBool())
 
 			ent:SetupBones()
 			ent:InvalidateBoneCache()
@@ -1648,7 +1648,7 @@ function PANEL:RebuildControls(tab, d, d2, d3)
 				end
 			end
 
-			if !GetConVar("cl_animprop_editor_bone_hierarchy"):GetBool() then
+			if !GetConVar("cl_animprop_editor_bone_hierarchyview"):GetBool() then
 				for id = 0, ent:GetBoneCount() do
 					local name = ent:GetBoneName(id)
 					if name != "__INVALIDBONE__" then
@@ -1686,7 +1686,7 @@ function PANEL:RebuildControls(tab, d, d2, d3)
 			//indents and id numbers both completely break alphabetical sorting; this wasn't even 
 			//an intended feature at all, but i'm not turning it off completely because you just 
 			//know there's *someone* out there who's made it an integral part of their workflow.
-			list:SetSortable(!GetConVar("cl_animprop_editor_bone_hierarchy"):GetBool() and !GetConVar("cl_animprop_editor_bone_ids"):GetBool())
+			list:SetSortable(!GetConVar("cl_animprop_editor_bone_hierarchyview"):GetBool() and !GetConVar("cl_animprop_editor_bone_ids"):GetBool())
 		
 		end
 
@@ -1828,7 +1828,7 @@ function PANEL:RebuildControls(tab, d, d2, d3)
 				back.TargetBoneList.selectedtargetbone = selectedtargetbone
 
 				drop.Combo:AddChoice("(none)", -1, (selectedtargetbone == -1))
-				if !GetConVar("cl_animprop_editor_bone_hierarchy"):GetBool() then
+				if !GetConVar("cl_animprop_editor_bone_hierarchyview"):GetBool() then
 					for id = 0, ent2:GetBoneCount() - 1 do
 						local name = ent2:GetBoneName(id)
 						if name != "__INVALIDBONE__" then
@@ -2098,17 +2098,30 @@ function PANEL:RebuildControls(tab, d, d2, d3)
 				//Now restore the selected bones
 				back.BoneList:ClearSelection()
 				for k, line in pairs (back.BoneList:GetLines()) do
-					if tab[line.id] then back.BoneList:SelectItem(line) end
+					if tab[line.id] then
+						back.BoneList:SelectItem(line)
+						//if we're going from multiselect on to multiselect off, then only reselect 1 bone
+						if !GetConVar("cl_animprop_editor_bone_multiselect"):GetBool() then break end
+					end
 				end
 			end
+
+			local check = vgui.Create( "DCheckBoxLabel", rpnl)
+			check:SetText("Enable selecting multiple bones\n(ctrl+click, shift+click, or click and drag)")
+			check:SetDark(true)
+			//check:SetHeight(15)
+			check:Dock(TOP)
+			check:DockMargin(padding,betweenitems*2,0,0)
+			check:SetConVar("cl_animprop_editor_bone_multiselect")
+			check.OnChange = BonelistUpdateAppearance
 
 			local check = vgui.Create( "DCheckBoxLabel", rpnl)
 			check:SetText("Display bone list as hierarchy")
 			check:SetDark(true)
 			check:SetHeight(15)
 			check:Dock(TOP)
-			check:DockMargin(padding,betweenitems*2,0,0)
-			check:SetConVar("cl_animprop_editor_bone_hierarchy")
+			check:DockMargin(padding,betweenitems,0,0)
+			check:SetConVar("cl_animprop_editor_bone_hierarchyview")
 			check.OnChange = BonelistUpdateAppearance
 
 			local check = vgui.Create( "DCheckBoxLabel", rpnl)
@@ -2119,7 +2132,6 @@ function PANEL:RebuildControls(tab, d, d2, d3)
 			check:DockMargin(padding,betweenitems,0,0)
 			check:SetConVar("cl_animprop_editor_bone_ids")
 			check.OnChange = BonelistUpdateAppearance
-			//TODO: see if we need to do SetValue for these, even though they're doing SetConVar
 
 			local check = vgui.Create( "DCheckBoxLabel", rpnl)
 			check:SetText("Show icons for linked/unlinked bones")
