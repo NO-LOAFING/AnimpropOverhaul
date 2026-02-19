@@ -394,9 +394,9 @@ if SERVER then
 		//Copy certain non-physics constraints over to the animprop
 		local ConstraintsToPreserve = {
 			AdvBoneMerge = true,
-			AttachParticleControllerBeam = true, //Advanced Particle Controller addon
-			PartCtrl_Ent = true, //ParticleControlOverhaul
-			PartCtrl_SpecialEffect = true, //ParticleControlOverhaul
+			AttachParticleControllerBeam = true, //old Advanced Particle Controller addon
+			PEPlus_Ent = true, //Particle Effects+ addon
+			PEPlus_SpecialEffect = true, //Particle Effects+ addon
 			//BoneMerge = true, //Bone Merger addon
 			EasyBonemerge = true, //Easy Bonemerge Tool addon
 			CompositeEntities_Constraint = true, //Composite Bonemerge addon
@@ -411,12 +411,12 @@ if SERVER then
 							const[key] = prop 
 						//Transfer over bonemerged ents from other addons' bonemerge constraints, and make sure they don't get DeleteOnRemoved
 						elseif (const.Type == "EasyBonemerge" or const.Type == "CompositeEntities_Constraint" 
-						or const.Type == "PartCtrl_Ent" or const.Type == "PartCtrl_SpecialEffect") //doesn't work for BoneMerge, bah
+						or const.Type == "PEPlus_Ent" or const.Type == "PEPlus_SpecialEffect") //doesn't work for BoneMerge, bah
 						and isentity(val) and IsValid(val) and val:GetParent() == oldent then
 							//MsgN("reparenting ", val:GetModel(), " ", val, " to ", prop)
 							if const.Type == "CompositeEntities_Constraint" then
 								val:SetParent(prop)
-							--[[elseif const.Type == "PartCtrl_SpecialEffect" then //seems to be redundant here but not in advbonemerge, not sure why
+							--[[elseif const.Type == "PEPlus_SpecialEffect" then //seems to be redundant here but not in advbonemerge, not sure why
 								val:SetParent(prop)
 								val:SetSpecialEffectParent(prop)]]
 							end
@@ -436,7 +436,7 @@ if SERVER then
 						entstab[const.Entity[tabnum].Index] = const.Entity[tabnum].Entity
 					end
 
-					if const.Type == "PartCtrl_Ent" --[[or const.Type == "PartCtrl_SpecialEffect"]] and IsValid(const.Ent1) then //again, PartCtrl_SpecialEffect handling doesn't seem to be necessary here for some reason
+					if const.Type == "PEPlus_Ent" --[[or const.Type == "PEPlus_SpecialEffect"]] and IsValid(const.Ent1) then //again, PEPlus_SpecialEffect handling doesn't seem to be necessary here for some reason
 						oldent:DontDeleteOnRemove(const.Ent1) //Make sure we also clear deleteonremove for unparented cpoints
 					end
 
@@ -445,10 +445,10 @@ if SERVER then
 				end
 			end
 		end
-		//Unbreak all ParticleControlOverhaul fx attached to the prop or any of its children
-		if PartCtrl_RefreshAllChildFx then 
+		//Unbreak all Particle Effects+ fx attached to the prop or any of its children
+		if PEPlus_RefreshAllChildFx then 
 			timer.Simple(0.1, function() //do this on a timer, otherwise the prop might not exist on the client yet when they receive the new table
-				PartCtrl_RefreshAllChildFx(prop)
+				PEPlus_RefreshAllChildFx(prop)
 			end)
 		end
 

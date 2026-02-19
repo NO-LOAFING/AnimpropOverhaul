@@ -452,9 +452,9 @@ end
 //Ignore certain non-physics constraints for effect physics
 local ConstraintsToPreserve = {
 	AdvBoneMerge = true,
-	AttachParticleControllerBeam = true, //Advanced Particle Controller addon
-	PartCtrl_Ent = true, //ParticleControlOverhaul
-	PartCtrl_SpecialEffect = true, //ParticleControlOverhaul
+	AttachParticleControllerBeam = true, //old Advanced Particle Controller addon
+	PEPlus_Ent = true, //Particle Effects+ addon
+	PEPlus_SpecialEffect = true, //Particle Effects+ addon
 	BoneMerge = true, //Bone Merger addon
 	EasyBonemerge = true, //Easy Bonemerge Tool addon
 	CompositeEntities_Constraint = true, //Composite Bonemerge addon

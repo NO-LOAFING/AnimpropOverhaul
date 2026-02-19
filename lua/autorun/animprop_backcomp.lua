@@ -94,7 +94,7 @@ conversion_funcs = {
 	end,
 	//animprop_generic_physmodel doesn't need a func here, it's handled by its child animprop
 	//"Premade" animprops were originally made because it wasn't possible to add their particle effects or multiple models yourself at the time. 
-	//Nowadays, though, we have ParticleControlOverhaul/Adv. Particle Controller for particle effects, and Advanced Bonemerge for multiple models,
+	//Nowadays, though, we have Particle Effects+/Adv. Particle Controller for particle effects, and Advanced Bonemerge for multiple models,
 	//so they really aren't necessary any more. Spawn regular animprops modified with those tools instead.
 	animprop_spawnacarrier = function(ent, ply)
 		local animprop = ConvertEntityToAnimprop(ent, ply, true, false)
@@ -146,11 +146,11 @@ conversion_funcs = {
 			else
 				entrance = "exit"
 			end
-			if PartCtrl_SpawnParticle then
-				//Attach the particles with ParticleControlOverhaul
+			if PEPlus_SpawnParticle then
+				//Attach the particles with Particle Effects+
 
 				//Charged effect
-				local p = PartCtrl_SpawnParticle(ply, animprop:GetPos(), "teleporter_" .. team .. "_charged_level" .. lv, "particles/teleport_status.pcf", "tf", true)
+				local p = PEPlus_SpawnParticle(ply, animprop:GetPos(), "teleporter_" .. team .. "_charged_level" .. lv, "particles/teleport_status.pcf", "tf", true)
 				if IsValid(p) then
 					for k, v in pairs (p.ParticleInfo) do
 						if v.ent then
@@ -160,7 +160,7 @@ conversion_funcs = {
 				end
 
 				//Direction effect
-				local p = PartCtrl_SpawnParticle(ply, animprop:GetPos(), "teleporter_" .. team .. "_" .. entrance .. "_level" .. lv, "particles/teleport_status.pcf", "tf", true)
+				local p = PEPlus_SpawnParticle(ply, animprop:GetPos(), "teleporter_" .. team .. "_" .. entrance .. "_level" .. lv, "particles/teleport_status.pcf", "tf", true)
 				if IsValid(p) then
 					for k, v in pairs (p.ParticleInfo) do
 						if v.ent then
@@ -170,7 +170,7 @@ conversion_funcs = {
 				end
 
 				//Arm effect 1 (apparently charged teleporters have these as well https://github.com/ValveSoftware/source-sdk-2013/blob/master/src/game/client/tf/c_obj_teleporter.cpp#L96-L129)
-				local p = PartCtrl_SpawnParticle(ply, animprop:GetPos(), "teleporter_arms_circle_" .. team, "particles/teleport_status.pcf", "tf", true)
+				local p = PEPlus_SpawnParticle(ply, animprop:GetPos(), "teleporter_arms_circle_" .. team, "particles/teleport_status.pcf", "tf", true)
 				if IsValid(p) then
 					for k, v in pairs (p.ParticleInfo) do
 						if v.ent then
@@ -180,7 +180,7 @@ conversion_funcs = {
 				end
 
 				//Arm effect 2
-				local p = PartCtrl_SpawnParticle(ply, animprop:GetPos(), "teleporter_arms_circle_" .. team, "particles/teleport_status.pcf", "tf", true)
+				local p = PEPlus_SpawnParticle(ply, animprop:GetPos(), "teleporter_arms_circle_" .. team, "particles/teleport_status.pcf", "tf", true)
 				if IsValid(p) then
 					for k, v in pairs (p.ParticleInfo) do
 						if v.ent then
@@ -189,7 +189,7 @@ conversion_funcs = {
 					end
 				end
 			elseif AttachParticleControllerNormal then
-				//Attach the particles with Adv. Particle Controller (old addon) as a fallback
+				//Attach the particles with old Adv. Particle Controller as a fallback
 				local genericparticletable = { 
 					RepeatRate = 0, 
 					RepeatSafety = 1, 
@@ -249,10 +249,10 @@ conversion_funcs = {
 			else
 				team = "_red"
 			end
-			if PartCtrl_SpawnParticle then
-				//Attach the particles with ParticleControlOverhaul
+			if PEPlus_SpawnParticle then
+				//Attach the particles with Particle Effects+
 				//Light effect
-				local p = PartCtrl_SpawnParticle(ply, animprop:GetPos(), "cart_flashinglight" .. team, "particles/flag_particles.pcf", "tf", true)
+				local p = PEPlus_SpawnParticle(ply, animprop:GetPos(), "cart_flashinglight" .. team, "particles/flag_particles.pcf", "tf", true)
 				if IsValid(p) then
 					for k, v in pairs (p.ParticleInfo) do
 						if v.ent then
@@ -261,7 +261,7 @@ conversion_funcs = {
 					end
 				end
 			elseif AttachParticleControllerNormal then
-				//Attach the particles with Adv. Particle Controller (old addon) as a fallback
+				//Attach the particles with old Adv. Particle Controller as a fallback
 				//Light effect
 				AttachParticleControllerNormal(ply, animprop, {NewTable = {
 					EffectName = "cart_flashinglight" .. team,
