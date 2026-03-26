@@ -334,6 +334,8 @@ end
 
 function ENT:Initialize()
 
+	self:AddFlags(FL_NOTARGET) //prevent the prop from being targeted by NPCs using VJ Base/ZBase
+
 	if SERVER then
 
 		//Set up tables used for animation looping
