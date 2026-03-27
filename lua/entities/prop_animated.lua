@@ -451,6 +451,15 @@ end
 
 
 
+local cv_min
+local cv_max
+local cv_max_phys
+if SERVER then
+	cv_min = GetConVar("sv_animprop_scale_min")
+	cv_max = GetConVar("sv_animprop_scale_max")
+	cv_max_phys = GetConVar("sv_animprop_scale_max_phys")
+end
+
 //Ignore certain non-physics constraints for effect physics
 local ConstraintsToPreserve = {
 	AdvBoneMerge = true,
@@ -503,17 +512,20 @@ function ENT:Think()
 		//If the player changed the model scale, then update physics
 		local scale = self:GetModelScale()
 		if scale != self.CurModelScale then
+			//In multiplayer, don't let players make props too big or small and grief the server
+			//By default, we hard cap scale at 16 to avoid a physics bug that can cause the game to freeze - past this point, the performance impact of moving a prop around starts to increase exponentially with its scale (check +showbudget), to the point where setting any model's scale to about 50 or so will reduce the game to multiple seconds per frame.
+			//TODO: I'm not sure what's causing this bug, I thought it was mass-based (smaller models like the HL2 grenade need higher scale values to start bugging out, while something like the TF2 crate starts chugging even at 16), but the differences between models also apply to effects even though they should all have identical physobjs, and even changing effect physobjs to not scale with the model STILL results in this bug happening, so what's even going on here? This probably isn't the best way to check for this.
+			if !game.SinglePlayer() then
+				if scale > cv_max:GetFloat() then
+					self:SetModelScale(cv_max:GetFloat())
+					scale = self:GetModelScale()
+				elseif scale < cv_min:GetFloat() then
+					self:SetModelScale(cv_min:GetFloat())
+					scale = self:GetModelScale()
+				end
+			end
 			if scale == 1 then
 				self:SetModelScale(1.0000001)
-			//In multiplayer, don't let players make props too big or small and grief the server
-			//We hard cap scale at 16 to avoid a physics bug that can cause the game to freeze - past this point, the performance impact of moving a prop around starts to increase exponentially with its scale (check +showbudget), to the point where setting any model's scale to about 50 or so will reduce the game to multiple seconds per frame.
-			//TODO: I'm not sure what's causing this bug, I thought it was mass-based (smaller models like the HL2 grenade need higher scale values to start bugging out, while something like the TF2 crate starts chugging even at 16), but the differences between models also apply to effects even though they should all have identical physobjs, and even changing effect physobjs to not scale with the model STILL results in this bug happening, so what's even going on here? This probably isn't the best way to check for this.
-			elseif !game.SinglePlayer() then
-				if scale > 16 then
-					self:SetModelScale(16)
-				elseif scale < 0.05 then
-					self:SetModelScale(0.05)
-				end
 			end
 			self.ThinkUpdateAnimpropPhysics = true
 			self.CurModelScale = self:GetModelScale()
@@ -1230,20 +1242,23 @@ if SERVER then
 			return
 		end
 
-		//If our model scale is exactly 1, EnableCustomCollisions won't work, and player collisions and traces will still use the default collision mesh 
-		//instead of the custom collision mesh (why?)
-		if self:GetModelScale() == 1 then
-			self:SetModelScale(1.0000001)
-		//In multiplayer, don't let players make props too big or small and grief the server
-		//(see ENT:Think() comments for why we cap this at 16)
-		elseif !game.SinglePlayer() then
-			if self:GetModelScale() > 16 then
-				self:SetModelScale(16)
-			elseif self:GetModelScale() < 0.05 then
-				self:SetModelScale(0.05)
+		local scale = self:GetModelScale()
+		//In multiplayer, don't let players make props too big or small and grief the server (see ENT:Think() comments for more details)
+		if !game.SinglePlayer() then
+			if scale > cv_max:GetFloat() then
+				self:SetModelScale(cv_max:GetFloat())
+				scale = self:GetModelScale()
+			elseif scale < cv_min:GetFloat() then
+				self:SetModelScale(cv_min:GetFloat())
+				scale = self:GetModelScale()
 			end
 		end
-		local scale = self:GetModelScale()
+		//If our model scale is exactly 1, EnableCustomCollisions won't work, and player collisions and traces will still use the default collision mesh 
+		//instead of the custom collision mesh (why?)
+		if scale == 1 then
+			self:SetModelScale(1.0000001)
+			scale = self:GetModelScale()
+		end
 
 		//Save whether or not the physobj is frozen so we can reapply that state to the new physobj
 		local motion = true
@@ -1276,8 +1291,18 @@ if SERVER then
 		end
 
 
-		//Physics prop
 		local mode = self:GetPhysicsMode()
+
+		//In multiplayer, force animprops over a certain scale to use effect physics
+		if !game.SinglePlayer() and mode != 2 and scale > cv_max_phys:GetFloat() then
+			self:SetPhysicsMode(2)
+			mode = 2
+			//This gets out of sync somehow if a player pastes a dupe over the max size, causing this value 
+			//to change immediately upon ent spawn, so change the value again after a delay to fix this
+			timer.Simple(0, function() if IsValid(self) then self:SetPhysicsMode(2) end end)
+		end
+
+		//Physics prop
 		if mode == 0 then
 
 			//Only allow this option for prop models, otherwise use a physics box instead
@@ -1352,8 +1377,6 @@ if SERVER then
 				phys:Sleep()
 				phys:Wake()
 			end
-
-			
 
 		//Physics box
 		elseif mode == 1 then

@@ -2242,7 +2242,7 @@ function PANEL:RebuildControls(tab, d, d2, d3)
 
 		local slider = vgui.Create("DNumSlider", pnl)
 		slider:SetText("Model Scale")
-		slider:SetMinMax(0.06, 16)
+		slider:SetMinMax(GetConVar("sv_animprop_scale_min"):GetFloat(), GetConVar("sv_animprop_scale_max"):GetFloat())
 		slider:SetDefaultValue(1.00)
 		slider:SetDark(true)
 		slider:SetHeight(18)

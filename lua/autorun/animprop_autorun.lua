@@ -728,3 +728,11 @@ if CLIENT then
 		m:AddCVar("Draw Animated Prop Physics Boxes", "cl_animprop_drawphysboxes", "1", "0")
 	end)
 end
+
+
+
+
+//Add convars to control max prop size in multiplayer, for anti-griefing purposes
+CreateConVar("sv_animprop_scale_min", 0.0625, {FCVAR_ARCHIVE, FCVAR_REPLICATED}, "In multiplayer games, sets minimum scale of animated props")
+CreateConVar("sv_animprop_scale_max", 16, {FCVAR_ARCHIVE, FCVAR_REPLICATED}, "In multiplayer games, sets maximum scale of animated props")
+CreateConVar("sv_animprop_scale_max_phys", 16, {FCVAR_ARCHIVE, FCVAR_REPLICATED}, "In multiplayer games, sets maximum scale of animated props before they're forced to use effect physics")
