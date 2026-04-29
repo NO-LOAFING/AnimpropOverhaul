@@ -448,6 +448,24 @@ function ENT:Initialize()
 
 end
 
+//Client "full updates" happen upon new player connection, lag spikes, running the 'cl_fullupdate' concommand, and demo recording (all but the last 
+//are exclusive to multiplayer) - this recreates the entity, but doesn't run Initialize again, which breaks our BuildBonePositions callback, so fix 
+//this by running Initialize again manually. For demo support, we also need to request the server to send us a new info table, so that the demo can 
+//record this one.
+function ENT:OnRemove(fullupdate)
+	if fullupdate then
+		timer.Simple(0, function()
+			if IsValid(self) then
+				self:Initialize()
+				self.AdvBone_BoneInfo_Received = false
+				//timer.Simple(1, function() 		//in the old implementation in Think, we had to do this on a timer - otherwise, if the ent was spawned before 
+					self.RemapInfo_Received = false	//recording, upon playback the recorded remapinfo receive func would run BEFORE the ent had nwvars set up, so 
+				//end)					//the receive func wouldn't be able to get the puppeteer. this doesn't seem to be the case here?
+			end
+		end)
+	end
+end
+
 
 
 
@@ -749,19 +767,6 @@ function ENT:Think()
 		return true
 
 	else
-
-		//Fix for demo recording and playback - when demos are recorded, they wipe a bunch of clientside settings like LODs and our BuildBonePositions callback, so redo those by running Initialize.
-		//They also don't seem to record clientside values set on the entity before recording, so tell the server to send us a new BoneInfo and RemapInfo table so we can actually record these ones.
-		//Note 10/16/24: Newly connected players also do this, they run Initialize but then wipe the callback and LOD setting right after.
-		//However, unlike ent_advbonemerge and prop_resizedragdoll_physparent, this entity still gets the chance to run BuildBonePositions 1-3 times before it gets wiped, so we can't rely 
-		//on checking if it's already run the function. Instead, we have to check this all the time, and make GetCallbacks create a new table every frame. >:(
-		if --[[(!self.BuildBonePositions_HasRun or engine.IsRecordingDemo()) and]] #self:GetCallbacks("BuildBonePositions") == 0 and self.GetPuppeteer then
-			self:Initialize()
-			self.AdvBone_BoneInfo_Received = false
-			timer.Simple(1, function() 		//we have to do this one on a timer - otherwise, if the ent was spawned before recording, upon playback the recorded remapinfo 
-				self.RemapInfo_Received = false	//receive func will run BEFORE the ent has nwvars set up, so the receive func won't be able to get the puppeteer
-			end)
-		end
 
 		local time = CurTime()
 		local parent = self:GetParent()
