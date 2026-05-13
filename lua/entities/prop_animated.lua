@@ -823,8 +823,8 @@ function ENT:Think()
 		//MsgN(min, ", ", max)
 		debugoverlay.BoxAngles(Vector(), min, max, Angle(), 0.05, Color(0,255,150,0))]]
 
-		//(Advanced Bonemerge) Set the render bounds (TODO: advbone checks to make sure the BuildBonePositions func isn't "asleep" before doing this, to prevent running this unnecessarily, but it might be more complicated for animprops)
-		if !self.IsPuppeteer and self.AdvBone_RenderBounds_BoneMins and self.AdvBone_RenderBounds_HighestBoneScale then
+		//(Advanced Bonemerge) Set the render bounds
+		if !self.AdvBone_Asleep and !self.IsPuppeteer and self.AdvBone_RenderBounds_BoneMins and self.AdvBone_RenderBounds_HighestBoneScale then
 			local bloat = nil
 			if self.AdvBone_RenderBounds_Bloat then
 				bloat = self.AdvBone_RenderBounds_Bloat * self.AdvBone_RenderBounds_HighestBoneScale
@@ -3018,6 +3018,9 @@ if CLIENT then
 		Animprop_IsSkyboxDrawing = false
 	end)
 
+	CreateClientConVar("cl_animprop_debug_sleep", 0, false, false, "If 1, show sleep status of prop_animated's BuildBonePositions function (red = asleep, green = awake, no color = not running BuildBonePositions)", 0, 1)
+	local cv_debug_sleep = GetConVar("cl_animprop_debug_sleep")
+
 	function ENT:Draw(flag)
 
 		//try to prevent this from being rendered additional times if it has a child with EF_BONEMERGE; TODO: i can't find any situation where this breaks anything, but it still feels like it could.
@@ -3083,6 +3086,13 @@ if CLIENT then
 		self:SetEyeTarget(pos)
 		self.DontLocalizeEyePose = nil
 
+		if cv_debug_sleep:GetBool() then
+			if self.AdvBone_Asleep then
+				render.SetColorModulation(1,0,0)
+			else
+				render.SetColorModulation(0,1,0)
+			end
+		end
 
 		//For some reason I can't explain, setting a puppeteer's alpha to 0 with SetColor causes its BuildBonePositions hook to stop running, making it useless as a puppeteer 
 		//(this ONLY happens with puppeteers, not other animprops or advbonemerged stuff!), so we need to handle its transparency in-code here.
@@ -3758,8 +3768,37 @@ if CLIENT then
 
 	end
 
-	CreateClientConVar("cl_animprop_debug_sleep", 0, false, false, "If 1, show sleep status of prop_animated's BuildBonePositions function (red = asleep, green = awake, no color = not running BuildBonePositions)", 0, 1)
-	local cv_debug_sleep = GetConVar("cl_animprop_debug_sleep")
+	--[[local function DotAbs(v0,v1)
+		return math.abs(v0.x*v1.x) + math.abs(v0.y*v1.y) + math.abs(v0.z*v1.z)
+	end
+	local m = Matrix()]]
+	//Adaptation of valve's RotateAABB. https://github.com/ValveSoftware/source-sdk-2013/blob/master/src/mathlib/mathlib_base.cpp#L2967
+	local function GetRotatedAABB(mins, maxs, ang)
+		--[[local localCenter = (mins + maxs) * 0.5
+		local localExtents = maxs - localCenter
+		localCenter:Rotate(ang)
+
+		//Just using the fwd/left/up from the angle returns bad results if the angle is rotated on more than one axis,
+		//instead we also have to do this matrix inversion thing adapted from goldsrc/xash3D(?) code https://github.com/Aynekko/Diffusion/blob/master/game_shared/mathlib.cpp#L218
+		m:Identity()
+		m:SetAngles(ang)
+		m:Invert()
+		local newExtents = Vector(
+			DotAbs(localExtents, m:GetForward()),
+			DotAbs(localExtents, -m:GetRight()),
+			DotAbs(localExtents, m:GetUp())
+		)
+
+		return localCenter - newExtents, localCenter + newExtents]]
+
+		//This method is faster actually
+		if !IsValid(AdvBone_AABB) then
+			AdvBone_AABB = ClientsideModel("models/props_junk/watermelon01.mdl", RENDERGROUP_OTHER)
+			AdvBone_AABB:SetColor(Color(0,0,0,0))
+		end
+		AdvBone_AABB:SetAngles(ang)
+		return AdvBone_AABB:GetRotatedAABB(mins, maxs)
+	end
 
 	function ENT:BuildBonePositions(bonecount)
 		if !IsValid(self) then return end
@@ -3770,7 +3809,7 @@ if CLIENT then
 		if self.MinigunAnimBone then
 			local matr = self:GetBoneMatrix(self.MinigunAnimBone)
 			if matr then
-				matr:Rotate( Angle(0, self.MinigunAnimAngle, 0) )
+				matr:Rotate(Angle(0, self.MinigunAnimAngle, 0))
 				self:SetBoneMatrix(self.MinigunAnimBone, matr)
 			end
 		end
@@ -3938,15 +3977,6 @@ if CLIENT then
 			end
 		end
 
-		if cv_debug_sleep and cv_debug_sleep:GetBool() then
-			if skip then
-				self:SetColor( Color(255,0,0,255) )
-				debugoverlay.Sphere(self:GetPos(), 10, 0, Color(255,0,0,32), true) //setcolor doesn't work for puppeteers unless game is paused (why?) so this is the alternative
-			else
-				self:SetColor( Color(0,255,0,255) )
-				debugoverlay.Sphere(self:GetPos(), 10, 0, Color(0,255,0,32), true) //^
-			end
-		end
 		//If we're going to skip, then use cached bone matrices instead of computing new ones, and stop here
 		if skip then
 			if parent and self.AdvBone_OriginMatrix then
@@ -3963,8 +3993,10 @@ if CLIENT then
 					self:SetBoneMatrix(i, self.SavedBoneMatrices[i])
 				end
 			end
+			self.AdvBone_Asleep = true //this tells the think func to stop calculating render bounds
 			return
 		end
+		self.AdvBone_Asleep = nil
 
 
 
@@ -4372,7 +4404,7 @@ if CLIENT then
 							end
 							if self.AdvBone_BoneHitBoxes[i] then
 								//local pos = matr:GetTranslation()
-								local scl = matr:GetScale()
+								--[[local scl = matr:GetScale()
 								local pmins = self.AdvBone_BoneHitBoxes[i].min * scl
 								local pmaxs = self.AdvBone_BoneHitBoxes[i].max * scl
 								local vects = {
@@ -4401,7 +4433,20 @@ if CLIENT then
 										math.max(vects[1].y, vects[2].y, vects[3].y, vects[4].y, 
 										vects[5].y, vects[6].y, vects[7].y, vects[8].y),
 										math.max(vects[1].z, vects[2].z, vects[3].z, vects[4].z, 
-										vects[5].z, vects[6].z, vects[7].z, vects[8].z) )
+										vects[5].z, vects[6].z, vects[7].z, vects[8].z) )]]
+
+								//new method, is this faster?
+								local scl = matr:GetScale()
+								local pos, ang
+								if parent then
+									pos, ang = WorldToLocal(matr:GetTranslation(), matr:GetAngles(), parent:GetPos(), parent:GetAngles())
+								else
+									pos, ang = WorldToLocal(matr:GetTranslation(), matr:GetAngles(), self:GetPos(), self:GetAngles())
+								end
+								hitboxmin, hitboxmax = GetRotatedAABB(self.AdvBone_BoneHitBoxes[i].min * scl, self.AdvBone_BoneHitBoxes[i].max * scl, ang)
+								hitboxmin = hitboxmin + pos
+								hitboxmax = hitboxmax + pos
+
 								self.SavedLocalHitBoxes[i] = {min = hitboxmin, max = hitboxmax}
 							end
 							self.SavedLocalBonePositions[i] = bonepos
@@ -4415,11 +4460,9 @@ if CLIENT then
 						end
 
 						local function SetBoneMinsMaxs(vec)
-							if !bonemins and !bonemaxs then
-								bonemins = Vector()
-								bonemaxs = Vector()
-								bonemins:Set(vec)
-								bonemaxs:Set(vec)
+							if !bonemins then
+								bonemins = Vector(vec)
+								bonemaxs = Vector(vec)
 							else
 								bonemins.x = math.min(vec.x,bonemins.x)
 								bonemins.y = math.min(vec.y,bonemins.y)
@@ -4429,7 +4472,7 @@ if CLIENT then
 								bonemaxs.z = math.max(vec.z,bonemaxs.z)
 							end
 						end
-						if hitboxmin and hitboxmax then
+						if hitboxmin then
 							SetBoneMinsMaxs(hitboxmin)
 							SetBoneMinsMaxs(hitboxmax)
 							--[[if parent then
