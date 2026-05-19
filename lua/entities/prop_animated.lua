@@ -3757,41 +3757,17 @@ if CLIENT then
 				end
 			end
 		end
-		self.SavedLocalHitBoxes = {}
 
 		self.LastBuildBonePositionsTime = 0
 		self.SavedBoneMatrices = {}
-		self.SavedLocalBonePositions = {}
 		self.LastBoneChangeTime = CurTime()
 
 		self:AddCallback("BuildBonePositions", self.BuildBonePositions)
 
 	end
 
-	--[[local function DotAbs(v0,v1)
-		return math.abs(v0.x*v1.x) + math.abs(v0.y*v1.y) + math.abs(v0.z*v1.z)
-	end
-	local m = Matrix()]]
-	//Adaptation of valve's RotateAABB. https://github.com/ValveSoftware/source-sdk-2013/blob/master/src/mathlib/mathlib_base.cpp#L2967
 	local function GetRotatedAABB(mins, maxs, ang)
-		--[[local localCenter = (mins + maxs) * 0.5
-		local localExtents = maxs - localCenter
-		localCenter:Rotate(ang)
-
-		//Just using the fwd/left/up from the angle returns bad results if the angle is rotated on more than one axis,
-		//instead we also have to do this matrix inversion thing adapted from goldsrc/xash3D(?) code https://github.com/Aynekko/Diffusion/blob/master/game_shared/mathlib.cpp#L218
-		m:Identity()
-		m:SetAngles(ang)
-		m:Invert()
-		local newExtents = Vector(
-			DotAbs(localExtents, m:GetForward()),
-			DotAbs(localExtents, -m:GetRight()),
-			DotAbs(localExtents, m:GetUp())
-		)
-
-		return localCenter - newExtents, localCenter + newExtents]]
-
-		//This method is faster actually
+		//Tried doing an adaptation of valve's RotateAABB code, but turns out it's faster to just spawn a dummy ent to run it instead (https://github.com/ValveSoftware/source-sdk-2013/blob/master/src/mathlib/mathlib_base.cpp#L2967)
 		if !IsValid(AdvBone_AABB) then
 			AdvBone_AABB = ClientsideModel("models/props_junk/watermelon01.mdl", RENDERGROUP_OTHER)
 			AdvBone_AABB:SetColor(Color(0,0,0,0))
@@ -3802,7 +3778,6 @@ if CLIENT then
 
 	function ENT:BuildBonePositions(bonecount)
 		if !IsValid(self) then return end
-		//self.BuildBonePositions_HasRun = true //Newly connected players will add this callback, but then wipe it; this tells the think func that it actually went through
 		local curtime = CurTime()
 
 		//Handle in-code tf2 minigun animation, even if we don't want to do all the expensive advbonemerge stuff
@@ -4394,68 +4369,23 @@ if CLIENT then
 						end
 					else
 						//Get the min and max positions of our bones ("bone bounds") for our render bounds calculation to use
-						local bonepos = nil
-						local hitboxmin, hitboxmax = nil, nil
-						if !self.SavedLocalBonePositions[i] or !self.SavedBoneMatrices[i] or matr:GetTranslation() != self.SavedBoneMatrices[i]:GetTranslation() or matr:GetAngles() != self.SavedBoneMatrices[i]:GetAngles() then
+						local bmin, bmax = nil, nil
+						if self.AdvBone_BoneHitBoxes[i] then
+							local scl = matr:GetScale()
+							local pos, ang
 							if parent then
-								bonepos = WorldToLocal(matr:GetTranslation(), Angle(), parent:GetPos(), parent:GetAngles())
+								pos, ang = WorldToLocal(matr:GetTranslation(), matr:GetAngles(), parent:GetPos(), parent:GetAngles())
 							else
-								bonepos = WorldToLocal(matr:GetTranslation(), Angle(), self:GetPos(), self:GetAngles())
+								pos, ang = WorldToLocal(matr:GetTranslation(), matr:GetAngles(), self:GetPos(), self:GetAngles())
 							end
-							if self.AdvBone_BoneHitBoxes[i] then
-								//local pos = matr:GetTranslation()
-								--[[local scl = matr:GetScale()
-								local pmins = self.AdvBone_BoneHitBoxes[i].min * scl
-								local pmaxs = self.AdvBone_BoneHitBoxes[i].max * scl
-								local vects = {
-									pmins, Vector(pmaxs.x, pmins.y, pmins.z),
-									Vector(pmins.x, pmaxs.y, pmins.z), Vector(pmaxs.x, pmaxs.y, pmins.z),
-									Vector(pmins.x, pmins.y, pmaxs.z), Vector(pmaxs.x, pmins.y, pmaxs.z),
-									Vector(pmins.x, pmaxs.y, pmaxs.z), pmaxs,
-								}
-								for i = 1, #vects do
-									local wspos = LocalToWorld(vects[i], Angle(), matr:GetTranslation(), matr:GetAngles())
-									if parent then
-										wspos = WorldToLocal(wspos, Angle(), parent:GetPos(), parent:GetAngles()) //renderbounds are relative to the parent, because renderorigin/renderangles don't affect them
-									else
-										wspos = WorldToLocal(wspos, Angle(), self:GetPos(), self:GetAngles())
-									end
-									vects[i] = wspos
-								end
-								hitboxmin = Vector( math.min(vects[1].x, vects[2].x, vects[3].x, vects[4].x, 
-										vects[5].x, vects[6].x, vects[7].x, vects[8].x),
-										math.min(vects[1].y, vects[2].y, vects[3].y, vects[4].y, 
-										vects[5].y, vects[6].y, vects[7].y, vects[8].y),
-										math.min(vects[1].z, vects[2].z, vects[3].z, vects[4].z, 
-										vects[5].z, vects[6].z, vects[7].z, vects[8].z) )
-								hitboxmax = Vector( math.max(vects[1].x, vects[2].x, vects[3].x, vects[4].x, 
-										vects[5].x, vects[6].x, vects[7].x, vects[8].x),
-										math.max(vects[1].y, vects[2].y, vects[3].y, vects[4].y, 
-										vects[5].y, vects[6].y, vects[7].y, vects[8].y),
-										math.max(vects[1].z, vects[2].z, vects[3].z, vects[4].z, 
-										vects[5].z, vects[6].z, vects[7].z, vects[8].z) )]]
-
-								//new method, is this faster?
-								local scl = matr:GetScale()
-								local pos, ang
-								if parent then
-									pos, ang = WorldToLocal(matr:GetTranslation(), matr:GetAngles(), parent:GetPos(), parent:GetAngles())
-								else
-									pos, ang = WorldToLocal(matr:GetTranslation(), matr:GetAngles(), self:GetPos(), self:GetAngles())
-								end
-								hitboxmin, hitboxmax = GetRotatedAABB(self.AdvBone_BoneHitBoxes[i].min * scl, self.AdvBone_BoneHitBoxes[i].max * scl, ang)
-								hitboxmin = hitboxmin + pos
-								hitboxmax = hitboxmax + pos
-
-								self.SavedLocalHitBoxes[i] = {min = hitboxmin, max = hitboxmax}
-							end
-							self.SavedLocalBonePositions[i] = bonepos
+							bmin, bmax = GetRotatedAABB(self.AdvBone_BoneHitBoxes[i].min * scl, self.AdvBone_BoneHitBoxes[i].max * scl, ang)
+							bmin = bmin + pos
+							bmax = bmax + pos
 						else
-							//If the bone hasn't moved at all then just use the old position instead of calling WorldToLocal again
-							bonepos = self.SavedLocalBonePositions[i]
-							if self.SavedLocalHitBoxes[i] then
-								hitboxmin = self.SavedLocalHitBoxes[i].min
-								hitboxmax = self.SavedLocalHitBoxes[i].max
+							if parent then
+								bmin = WorldToLocal(matr:GetTranslation(), Angle(), parent:GetPos(), parent:GetAngles())
+							else
+								bmin = WorldToLocal(matr:GetTranslation(), Angle(), self:GetPos(), self:GetAngles())
 							end
 						end
 
@@ -4472,18 +4402,16 @@ if CLIENT then
 								bonemaxs.z = math.max(vec.z,bonemaxs.z)
 							end
 						end
-						if hitboxmin then
-							SetBoneMinsMaxs(hitboxmin)
-							SetBoneMinsMaxs(hitboxmax)
+						SetBoneMinsMaxs(bmin)
+						if bmax then
+							SetBoneMinsMaxs(bmax)
 							--[[if parent then
 								debugoverlay.BoxAngles(parent:GetPos(), hitboxmin, hitboxmax, parent:GetAngles(), 0.1, Color(255,255,0,0))
 							else
 								debugoverlay.BoxAngles(self:GetPos(), hitboxmin, hitboxmax, self:GetAngles(), 0.1, Color(255,255,0,0))
 							end]]
-						else
-							SetBoneMinsMaxs(bonepos)
 						end
-						
+							
 						//Apply the bone matrix
 						if self:GetBoneName(i) != "__INVALIDBONE__" then
 							self:SetBoneMatrix(i,matr)
