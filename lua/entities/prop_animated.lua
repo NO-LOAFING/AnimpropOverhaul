@@ -3771,6 +3771,7 @@ if CLIENT then
 		if !IsValid(AdvBone_AABB) then
 			AdvBone_AABB = ClientsideModel("models/props_junk/watermelon01.mdl", RENDERGROUP_OTHER)
 			AdvBone_AABB:SetColor(Color(0,0,0,0))
+			AdvBone_AABB:SetNoDraw(true)
 		end
 		AdvBone_AABB:SetAngles(ang)
 		return AdvBone_AABB:GetRotatedAABB(mins, maxs)
@@ -4406,9 +4407,9 @@ if CLIENT then
 						if bmax then
 							SetBoneMinsMaxs(bmax)
 							--[[if parent then
-								debugoverlay.BoxAngles(parent:GetPos(), hitboxmin, hitboxmax, parent:GetAngles(), 0.1, Color(255,255,0,0))
+								debugoverlay.BoxAngles(parent:GetPos(), bmin, bmax, parent:GetAngles(), 0.1, Color(255,255,0,0))
 							else
-								debugoverlay.BoxAngles(self:GetPos(), hitboxmin, hitboxmax, self:GetAngles(), 0.1, Color(255,255,0,0))
+								debugoverlay.BoxAngles(self:GetPos(), bmin, bmax, self:GetAngles(), 0.1, Color(255,255,0,0))
 							end]]
 						end
 							
