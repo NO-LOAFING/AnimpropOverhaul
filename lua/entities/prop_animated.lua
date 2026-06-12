@@ -3761,6 +3761,7 @@ if CLIENT then
 		self.LastBuildBonePositionsTime = 0
 		self.SavedBoneMatrices = {}
 		self.LastBoneChangeTime = CurTime()
+		self.LastModel = self:GetModel()
 
 		self:AddCallback("BuildBonePositions", self.BuildBonePositions)
 
@@ -3974,6 +3975,20 @@ if CLIENT then
 		end
 		self.AdvBone_Asleep = nil
 
+
+
+
+		//Catch errors caused by changing the entity's model:
+		//1: If the model has changed, DefaultBoneOffsets will be incorrect, so recreate them
+		//2: If we send an updated BoneInfo table for the new model at the same time, it'll take at least another frame to make it to clients,
+		//   so throw out the old table and wait to receive the new one.
+		if self.LastModel != self:GetModel() then
+			self.RemapInfo_DefaultBoneOffsets = nil
+			self.AdvBone_BoneInfo = nil
+			self.AdvBone_BoneInfo_Received = false
+			self.LastModel = self:GetModel()
+			return
+		end
 
 
 
