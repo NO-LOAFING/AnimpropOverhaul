@@ -2575,7 +2575,7 @@ function PANEL:BuildAnimationList(i, filter)
 	//Sort them in alphabetical order
 	self["SequenceList" .. i] = {}
 	for k, v in SortedPairsByValue(sequencelist) do
-		if !filter or v:find(filter) then
+		if !filter or v:find(filter, nil, true) then
 			table.insert(self["SequenceList" .. i], v)
 		end
 			
