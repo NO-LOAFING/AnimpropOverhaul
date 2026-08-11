@@ -770,10 +770,11 @@ function ENT:Think()
 
 		local time = CurTime()
 		local parent = self:GetParent()
+		if !IsValid(parent) then parent = nil end
 
 
 		//(Advanced Bonemerge) (Remapping) If an animation is playing, don't let BuildBonePositions fall asleep
-		if IsValid(parent) or self.IsPuppeteer or (table.Count(self.AdvBone_BoneManips) > 0 and !IsValid(self:GetPuppeteer())) then //don't do all these checks if we're not running buildbonepositions, or if our puppeteer is doing it for us
+		if parent or self.IsPuppeteer or (table.Count(self.AdvBone_BoneManips) > 0 and !IsValid(self:GetPuppeteer())) then //don't do all these checks if we're not running buildbonepositions, or if our puppeteer is doing it for us
 			local animplaying = false
 			for i = 1, 4 do
 				local seq = self["GetChannel" .. i .. "Sequence"](self)
@@ -799,7 +800,7 @@ function ENT:Think()
 				self.LastBoneChangeTime = time
 				//Puppeteers can run this too, so make sure they wake up their parent as well
 				if self.IsPuppeteer then 
-					if IsValid(parent) then
+					if parent then
 						parent.LastBoneChangeTime = time
 					end
 				end
@@ -831,7 +832,7 @@ function ENT:Think()
 				bloat = Vector(bloat, bloat, bloat)
 			end
 			local min, max = self.AdvBone_RenderBounds_BoneMins, self.AdvBone_RenderBounds_BoneMaxs
-			if IsValid(parent) then
+			if parent then
 				local min2, max2 = parent:GetRenderBounds()
 				//adding the parent's render bounds is necessary in order to prevent shadows from getting cut off in some cases i.e. when merged to ragdolls or animprops
 				min, max = Vector(math.min(min.x,min2.x),math.min(min.y,min2.y),math.min(min.z,min2.z)), Vector(math.max(max.x,max2.x),math.max(max.y,max2.y),math.max(max.z,max2.z))
@@ -840,7 +841,7 @@ function ENT:Think()
 
 			//debug: draw render bounds
 			--[[local min, max = self:GetRenderBounds()
-			if IsValid(parent) then
+			if parent then
 				debugoverlay.BoxAngles(parent:GetPos(), min, max, parent:GetAngles(), 0.1, Color(0,255,150,0))
 			else
 				debugoverlay.BoxAngles(self:GetPos(), min, max, self:GetAngles(), 0.1, Color(0,255,150,0))
@@ -848,7 +849,7 @@ function ENT:Think()
 		end
 		local focus = system.HasFocus()
 		if focus == nil or focus == true then //fix: updating shadows out of focus can cause a crash with the GPU Saver addon
-			if IsValid(parent) then
+			if parent then
 				//TODO: this doesn't set the size of the shadow properly unless we set EF_BONEMERGE on the merged ent, but doing that applies the
 				//default bonemerge effect to the model and squashes the animation on any matching bones, so we can't do that
 				//if !parent:IsEffectActive(EF_NOSHADOW) then
@@ -863,7 +864,7 @@ function ENT:Think()
 		end
 
 		//(Advanced Bonemerge) If we're unmerged then clear our render origin and angles so we don't get stuck in that spot
-		if !IsValid(self:GetParent()) and self:GetRenderOrigin() then
+		if !parent and self:GetRenderOrigin() then
 			self:SetRenderOrigin()
 			self:SetRenderAngles()
 		end
@@ -871,48 +872,45 @@ function ENT:Think()
 
 
 		//(Remapping) Set puppeteer's offset from parent and render bounds
-		if self.IsPuppeteer then
-			local parent = self:GetParent()
-			if IsValid(parent) then
-				//Copy parent's scale
-				local scale = parent:GetModelScale()
-				self:SetModelScale(scale)
+		if self.IsPuppeteer and parent then
+			//Copy parent's scale
+			local scale = parent:GetModelScale()
+			self:SetModelScale(scale)
 
-				//Move our model origin with some code mostly copied from BuildBonePositions
-				local posmanip, _ = LocalToWorld(self:GetPuppeteerPos() * parent:GetModelScale(), Angle(), Vector(), parent:GetAngles())
-				local newpos = parent:GetPos() + posmanip
-				if self:GetPos() != newpos then //don't move us if we don't have to, otherwise we'll set off CalcAbsolutePosition every frame
-					self:SetPos(newpos)
-				end
-				local newang = parent:GetAngles()
-				if self:GetAngles() != newang then
-					self:SetAngles(newang)
-				end
-				//Also move our render origin - setpos alone is unreliable since the position can get reasserted if the parent moves or something like that
-				self:SetRenderOrigin(newpos)
-				self:SetRenderAngles(newang)
-
-				//Set puppeteer's render bounds to always render if looking at the parent
-				local seqinfo = self:GetSequenceInfo(self:GetSequence())
-				if !seqinfo then //someone reported a bug where seqinfo returned nil (bad sequence?); not sure what would make this happen, but just use modelbounds as a fallback
-					local mins, maxs = self:GetModelBounds()
-					seqinfo = {
-						bbmin = mins,
-						bbmax = maxs
-					}
-				end
-				local min, max = seqinfo.bbmin * scale, seqinfo.bbmax * scale
-				local min2, max2 = parent:GetRenderBounds()
-				min2 = WorldToLocal(parent:GetPos() + min2, parent:GetAngles(), self:GetPos(), self:GetAngles())
-				max2 = WorldToLocal(parent:GetPos() + max2, parent:GetAngles(), self:GetPos(), self:GetAngles())
-				//This isn't the perfect way to account for weird angles like the ones we mighr get from -1 angle manips, and the render bounds get a bit big sometimes,
-				//but it gets the job done and it's cheaper than WorldToLocaling every corner of the parent's render box.
-				self:SetRenderBounds( Vector(math.min(min.x,min2.x,max2.x),math.min(min.y,min2.y,max2.y),math.min(min.z,min2.z,max2.z)), Vector(math.max(max.x,min2.x,max2.x),math.max(max.y,min2.y,max2.y),math.max(max.z,min2.z,max2.z)) )
-
-				//debug: draw render bounds
-				--[[local min, max = self:GetRenderBounds()
-				debugoverlay.BoxAngles(self:GetPos(), min, max, self:GetAngles(), 0.1, Color(0,255,150,0))]]
+			//Move our model origin with some code mostly copied from BuildBonePositions
+			local posmanip, _ = LocalToWorld(self:GetPuppeteerPos() * parent:GetModelScale(), Angle(), Vector(), parent:GetAngles())
+			local newpos = parent:GetPos() + posmanip
+			if self:GetPos() != newpos then //don't move us if we don't have to, otherwise we'll set off CalcAbsolutePosition every frame
+				self:SetPos(newpos)
 			end
+			local newang = parent:GetAngles()
+			if self:GetAngles() != newang then
+				self:SetAngles(newang)
+			end
+			//Also move our render origin - setpos alone is unreliable since the position can get reasserted if the parent moves or something like that
+			self:SetRenderOrigin(newpos)
+			self:SetRenderAngles(newang)
+
+			//Set puppeteer's render bounds to always render if looking at the parent
+			local seqinfo = self:GetSequenceInfo(self:GetSequence())
+			if !seqinfo then //someone reported a bug where seqinfo returned nil (bad sequence?); not sure what would make this happen, but just use modelbounds as a fallback
+				local mins, maxs = self:GetModelBounds()
+				seqinfo = {
+					bbmin = mins,
+					bbmax = maxs
+				}
+			end
+			local min, max = seqinfo.bbmin * scale, seqinfo.bbmax * scale
+			local min2, max2 = parent:GetRenderBounds()
+			min2 = WorldToLocal(parent:GetPos() + min2, parent:GetAngles(), self:GetPos(), self:GetAngles())
+			max2 = WorldToLocal(parent:GetPos() + max2, parent:GetAngles(), self:GetPos(), self:GetAngles())
+			//This isn't the perfect way to account for weird angles like the ones we mighr get from -1 angle manips, and the render bounds get a bit big sometimes,
+			//but it gets the job done and it's cheaper than WorldToLocaling every corner of the parent's render box.
+			self:SetRenderBounds( Vector(math.min(min.x,min2.x,max2.x),math.min(min.y,min2.y,max2.y),math.min(min.z,min2.z,max2.z)), Vector(math.max(max.x,min2.x,max2.x),math.max(max.y,min2.y,max2.y),math.max(max.z,min2.z,max2.z)) )
+
+			//debug: draw render bounds
+			--[[local min, max = self:GetRenderBounds()
+			debugoverlay.BoxAngles(self:GetPos(), min, max, self:GetAngles(), 0.1, Color(0,255,150,0))]]
 		end
 
 		//(Remapping)
@@ -935,6 +933,16 @@ function ENT:Think()
 			self.csmodeltoremove:Remove()
 			self.csmodeltoremove = nil
 		end
+
+		//(Advanced Bonemerge) fix: going out of the parent's PVS (e.g. going out of bounds) removes the EF_BONEMERGE effect; this breaks shadow 
+		//rendering and causes this entity not to properly follow its parent so readd the effect when it happens. this is copied from advbone
+		//(see https://github.com/NO-LOAFING/AdvBonemerge/pull/3), and fixes the same shadow issue nicely, but unfortunately doesn't work here 
+		//because EF_BONEMERGE applies the default bonemerge effect to the animprop and squashes the animation on any matching bones, so this is 
+		//only kept here for reference.
+		--[[if parent and !self.IsPuppeteer and !self:IsEffectActive(EF_BONEMERGE) then
+			self:AddEffects(EF_BONEMERGE)
+			self:AddEffects(EF_BONEMERGE_FASTCULL)
+		end]]
 
 
 		//Control in-code TF2 minigun animation
@@ -3089,9 +3097,10 @@ if CLIENT then
 		if cv_debug_sleep:GetBool() then
 			if self.AdvBone_Asleep then
 				render.SetColorModulation(1,0,0)
-			else
+			elseif self.AdvBone_Asleep == false then
 				render.SetColorModulation(0,1,0)
 			end
+			//if self.AdvBone_Asleep is nil (BuildBonePositions isn't running), then don't change color
 		end
 
 		//For some reason I can't explain, setting a puppeteer's alpha to 0 with SetColor causes its BuildBonePositions hook to stop running, making it useless as a puppeteer 
@@ -3866,7 +3875,7 @@ if CLIENT then
 		local parent = self:GetParent()
 		if !IsValid(parent) then
 			//If this ent isn't parented, bonemanipped, or puppeteered, then stop here, no need for expensive bone matrix calculation
-			if table.Count(self.AdvBone_BoneManips) == 0 and !IsValid(self:GetPuppeteer()) then return end
+			if table.Count(self.AdvBone_BoneManips) == 0 and !IsValid(self:GetPuppeteer()) then self.AdvBone_Asleep = nil return end //unlike advbone, make sure "not running buildbonepositions" is nil while "awake" is false, so that debug can display them differently
 			parent = nil
 		else
 			if parent.AttachedEntity then parent = parent.AttachedEntity end
@@ -3955,6 +3964,7 @@ if CLIENT then
 		end
 
 		//If we're going to skip, then use cached bone matrices instead of computing new ones, and stop here
+		self.AdvBone_Asleep = skip //this tells the think func to stop calculating render bounds
 		if skip then
 			if parent and self.AdvBone_OriginMatrix then
 				local matr = self.AdvBone_OriginMatrix
@@ -3970,10 +3980,12 @@ if CLIENT then
 					self:SetBoneMatrix(i, self.SavedBoneMatrices[i])
 				end
 			end
-			self.AdvBone_Asleep = true //this tells the think func to stop calculating render bounds
 			return
+		elseif parent and !self.IsPuppeteer then
+			//Without EF_BONEMERGE, we need to do this to give the parent entity a nudge every frame, otherwise some of 
+			//its bones like tf2 classes' weapon_bone will return _INVALIDBONE, and we won't be able to get their matrix.
+			parent:GetBonePosition(0) //note: which bone we get doesn't matter, this fixes all invalid bones; GetBoneMatrix doesn't work
 		end
-		self.AdvBone_Asleep = nil
 
 
 
