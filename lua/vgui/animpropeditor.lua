@@ -1585,6 +1585,19 @@ function PANEL:RebuildControls(tab, d, d2, d3)
 		lpnl:Dock(LEFT)
 		lpnl:DockMargin(5,0,2,5)
 
+		local entry = vgui.Create("DTextEntry", lpnl)
+		back.BoneFilter = entry
+		entry:SetPlaceholderText("#spawnmenu.quick_filter")
+		entry:SetHeight(20)
+		entry:Dock(TOP)
+		entry:DockMargin(0,0,0,-1)
+		entry:SetUpdateOnType(true)
+		entry.OnValueChange = function(self, txt)
+			if !self._IsUpdating then
+				back.BoneList.PopulateBoneList()
+			end
+		end
+
 		local list = vgui.Create("DListView", lpnl)
 		back.BoneList = list
 		list:AddColumn("Bone (" .. string.GetFileFromFilename(ent:GetModel()) .. ")")
@@ -1596,8 +1609,14 @@ function PANEL:RebuildControls(tab, d, d2, d3)
 		list.PopulateBoneList = function()
 
 			list:Clear()
-			list:ClearSelection() //TODO: is this unnecessary?
 			list:SetMultiSelect(GetConVar("cl_animprop_editor_bone_multiselect"):GetBool())
+
+			local filter = back.BoneFilter:GetText()
+			if filter == "" then
+				filter = nil
+			elseif filter then
+				filter = filter:lower()
+			end
 
 			ent:SetupBones()
 			ent:InvalidateBoneCache()
@@ -1605,6 +1624,8 @@ function PANEL:RebuildControls(tab, d, d2, d3)
 			list.Bones = {}
 
 			local function AddBone(name, id)
+				if filter and !name:lower():find(filter, nil, true) then return end
+
 				local line = list:AddLine(name)
 				list.Bones[id] = line
 				line.id = id
@@ -1703,45 +1724,63 @@ function PANEL:RebuildControls(tab, d, d2, d3)
 			//MsgN("running UpdateRemapOptions with selected bones: ")
 			//PrintTable(boneids)
 
-			local ang, ang_conflict_p, ang_conflict_y, ang_conflict_r
-			for k, line in pairs (boneids) do
-				local this_ang = ent.RemapInfo[line.id].ang
-				ang = ang or this_ang
-				if ang.p != this_ang.p then ang_conflict_p = true end
-				if ang.y != this_ang.y then ang_conflict_y = true end
-				if ang.r != this_ang.r then ang_conflict_r = true end
-			end
-
-			//if the keyboard focus is on a slider's text field when we update the slider's value, then the text value won't update correctly,
-			//so make sure to take the focus off of the text fields first
-			back.slider_ang_p.TextArea:KillFocus()
-			back.slider_ang_y.TextArea:KillFocus()
-			back.slider_ang_r.TextArea:KillFocus()
-
-			back.slider_ang_p:SetValue(ang.p)
-			back.slider_ang_y:SetValue(ang.y)
-			back.slider_ang_r:SetValue(ang.r)
-
-			if !ang_conflict_p then
-				//taking the focus off of the text areas isn't enough, we also need to update their text manually because vgui.GetKeyboardFocus()
-				//erroneously tells them that they've still got focus and shouldn't be updating themselves
-				back.slider_ang_p.TextArea:SetText(back.slider_ang_p.Scratch:GetTextValue())
+			if !IsValid(ent) or #boneids == 0 then
+				//disable all the remap options if there's no selected bone to use them
+				back.slider_ang_p:SetEnabled(false)
+				back.slider_ang_y:SetEnabled(false)
+				back.slider_ang_r:SetEnabled(false)
+				back.TargetBoneList:SetEnabled(false)
+				back.TargetBoneList:GetParent().Label:SetEnabled(false)
 			else
-				//we've selected multiple bones with conflicting values, don't show any number until this changes
-				back.slider_ang_p.TextArea:SetText("")
-			end
-			if !ang_conflict_y then
-				back.slider_ang_y.TextArea:SetText(back.slider_ang_y.Scratch:GetTextValue())
-			else
-				back.slider_ang_y.TextArea:SetText("")
-			end
-			if !ang_conflict_r then
-				back.slider_ang_r.TextArea:SetText(back.slider_ang_r.Scratch:GetTextValue())
-			else
-				back.slider_ang_r.TextArea:SetText("")
-			end
+				//reenable all the remap options if they're diabled
+				back.slider_ang_p:SetEnabled(true)
+				back.slider_ang_y:SetEnabled(true)
+				back.slider_ang_r:SetEnabled(true)
+				back.TargetBoneList:SetEnabled(true)
+				back.TargetBoneList:GetParent().Label:SetEnabled(true)
 
-			back.TargetBoneList.PopulateTargetBoneList()
+				local ang, ang_conflict_p, ang_conflict_y, ang_conflict_r
+				for k, line in pairs (boneids) do
+					local this_ang = ent.RemapInfo[line.id].ang
+					ang = ang or this_ang
+					if ang.p != this_ang.p then ang_conflict_p = true end
+					if ang.y != this_ang.y then ang_conflict_y = true end
+					if ang.r != this_ang.r then ang_conflict_r = true end
+				end
+
+				//if the keyboard focus is on a slider's text field when we update the slider's value, then the text value won't update correctly,
+				//so make sure to take the focus off of the text fields first
+				if !back.BoneFilter:HasFocus() then //running KillFocus on one of the other panels also kills the focus on the filter textentry, which interrupts the user while typing, so make sure not to do that
+					back.slider_ang_p.TextArea:KillFocus()
+					back.slider_ang_y.TextArea:KillFocus()
+					back.slider_ang_r.TextArea:KillFocus()
+				end
+
+				back.slider_ang_p:SetValue(ang.p)
+				back.slider_ang_y:SetValue(ang.y)
+				back.slider_ang_r:SetValue(ang.r)
+
+				if !ang_conflict_p then
+					//taking the focus off of the text areas isn't enough, we also need to update their text manually because vgui.GetKeyboardFocus()
+					//erroneously tells them that they've still got focus and shouldn't be updating themselves
+					back.slider_ang_p.TextArea:SetText(back.slider_ang_p.Scratch:GetTextValue())
+				else
+					//we've selected multiple bones with conflicting values, don't show any number until this changes
+					back.slider_ang_p.TextArea:SetText("")
+				end
+				if !ang_conflict_y then
+					back.slider_ang_y.TextArea:SetText(back.slider_ang_y.Scratch:GetTextValue())
+				else
+					back.slider_ang_y.TextArea:SetText("")
+				end
+				if !ang_conflict_r then
+					back.slider_ang_r.TextArea:SetText(back.slider_ang_r.Scratch:GetTextValue())
+				else
+					back.slider_ang_r.TextArea:SetText("")
+				end
+
+				back.TargetBoneList.PopulateTargetBoneList()
+			end
 
 			list.UpdatingRemapOptions = false
 		end
