@@ -3564,6 +3564,7 @@ if SERVER then
 	util.AddNetworkString("AnimProp_RemapInfoTable_GetFromSv")
 	util.AddNetworkString("AnimProp_RemapInfoTable_SendToCl")
 	util.AddNetworkString("AnimProp_RemapInfoFromEditor_SendToSv")
+	util.AddNetworkString("AnimProp_RemapInfoFromEditorPaste_SendToSv")
 	util.AddNetworkString("AnimProp_RemapInfoTableUpdate_SendToCl")
 
 
@@ -3634,6 +3635,48 @@ if SERVER then
 					net.WriteEntity(ent)
 				net.Send(filter)
 			end
+		end
+	end)
+
+
+	//If we received remapinfo from the client (for multiple bones, sent by right-clicking bone(s) in the editor), then apply it to the entity
+	net.Receive("AnimProp_RemapInfoFromEditorPaste_SendToSv", function(_, ply)
+		local ent = net.ReadEntity()
+
+		local demofix = net.ReadBool()
+
+		local count = net.ReadInt(9)
+		for i = 1, count do
+			local id = net.ReadInt(9)
+
+			local parent
+			if net.ReadBool() then
+				parent = net.ReadString()
+			end
+
+			local ang
+			if net.ReadBool() then
+				ang = Angle(net.ReadFloat(), net.ReadFloat(), net.ReadFloat())
+			end
+
+			if IsValid(ent) and ent:GetClass() == "prop_animated" and IsValid(ent:GetPuppeteer()) and ent.RemapInfo then
+				if parent == nil then parent = ent.RemapInfo[id].parent end
+				if ang == nil then ang = ent.RemapInfo[id].ang end
+				ent.RemapInfo[id] = {
+					parent = parent,
+					ang = ang,
+				}
+			end
+		end
+
+		if IsValid(ent) and ent:GetClass() == "prop_animated" and IsValid(ent:GetPuppeteer()) and ent.RemapInfo then
+			//Tell all the other clients that they need to update their RemapInfo tables to receive the changes (the original client already has the changes applied)
+			local filter = RecipientFilter()
+			filter:AddAllPlayers()
+			if !demofix then filter:RemovePlayer(ply) end //Fix for demo recording - demos don't record remapinfo changes made by the editor window, but they DO record network activity, so if ply was recording a demo, then send them a table update too
+			net.Start("AnimProp_RemapInfoTableUpdate_SendToCl")
+				net.WriteEntity(ent)
+			net.Send(filter)
 		end
 	end)
 

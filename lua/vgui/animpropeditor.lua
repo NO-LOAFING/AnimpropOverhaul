@@ -1572,11 +1572,117 @@ function PANEL:RebuildControls(tab, d, d2, d3)
 					net.WriteFloat(val)
 				end
 				net.WriteBool(engine.IsRecordingDemo())
-
-				//Wake up BuildBonePositions and get it to use the new info
-				ent.RemapInfo_RemapAngOffsets = nil
-				ent.LastBoneChangeTime = CurTime()
 			net.SendToServer()
+
+			//Wake up BuildBonePositions and get it to use the new info
+			ent.RemapInfo_RemapAngOffsets = nil
+			ent.LastBoneChangeTime = CurTime()
+		end
+
+
+
+		local function SendRemapInfoPasteToServer(tab, filter)
+			if !tab then return end
+
+			local serverinfo = {}
+			local pastecount = 0
+
+			for k, entry in pairs (tab) do
+				local id = ent:LookupBone(entry.bonename)
+				
+				if id then
+					//Compile information to be sent to the server for this bone
+					local serverentry = table.Copy(entry)
+					if filter then
+						//Optional "filter" arg to only paste one particular key to each bone (i.e. paste only scale)
+						for k, v in pairs (serverentry) do
+							if k != filter then serverentry[k] = nil end
+						end
+					end
+
+					serverentry.id = id
+					serverentry.bonename = nil
+
+					local parent_changed
+					local ang_changed
+					if ent.RemapInfo and ent.RemapInfo[id] then
+						//Only send parent or ang to the server if the value has changed, otherwise there's no point
+						if serverentry.parent and serverentry.parent != ent.RemapInfo[id].parent then
+							parent_changed = true
+						end
+						if serverentry.ang and serverentry.ang != ent.RemapInfo[id].ang then
+							ang_changed = true
+						end
+						//Also apply the new RemapInfo clientside
+						local i = {
+							parent = serverentry.parent,
+							ang = Angle(serverentry.ang),
+						}
+						if i.parent == nil then i.parent = ent.RemapInfo[id].parent end
+						if i.ang == nil then i.ang = ent.RemapInfo[id].ang end
+						ent.RemapInfo[id] = i
+					end
+					if !parent_changed then
+						serverentry.parent = nil
+					end
+					if !ang_changed then
+						serverentry.ang = nil
+					end
+
+					//Update visuals of list entries to show their new status
+					if serverentry.parent then
+						local targetboneid = -1
+						if serverentry.parent != "" then targetboneid = ent2:LookupBone(serverentry.parent) end
+						back.BoneList.Bones[id].HasTargetBone = targetboneid != -1
+					end
+
+					//If nothing has changed for this bone, don't bother sending it to the server
+					if !(!serverentry.targetbone and !serverentry.ang) then
+						table.insert(serverinfo, serverentry)
+					end
+					//Still keep a count of the number of bones the paste applied to, even if nothing changed
+					pastecount = pastecount + 1
+				end
+			end
+
+			--[[MsgN("client info:")
+			PrintTable(tab)]]
+			--[[MsgN("server info:")
+			PrintTable(serverinfo)]]
+
+			if table.Count(serverinfo) > 0 then //if none of the bones match then this will still be empty
+				//Then, send all of the information to the server so the duplicator can pick it up	
+				net.Start("AnimProp_RemapInfoFromEditorPaste_SendToSv")
+					net.WriteEntity(ent)
+
+					net.WriteBool(engine.IsRecordingDemo())
+
+					net.WriteInt(table.Count(serverinfo), 9)
+					for _, entry in pairs (serverinfo) do
+						net.WriteInt(entry.id, 9)
+
+						net.WriteBool(entry.parent)
+						if entry.parent then
+							net.WriteString(entry.parent)
+						end
+
+						net.WriteBool(entry.ang)
+						if entry.ang then
+							net.WriteFloat(entry.ang.p)
+							net.WriteFloat(entry.ang.y)
+							net.WriteFloat(entry.ang.r)
+						end
+					end
+				net.SendToServer()
+
+				back.BoneList.UpdateRemapOptions()
+			end
+
+			//Wake up BuildBonePositions and get it to use the new info
+			ent.RemapInfo_RemapAngOffsets = nil
+			ent.LastBoneChangeTime = CurTime()
+
+			return pastecount
 		end
 
 
@@ -1666,6 +1772,136 @@ function PANEL:RebuildControls(tab, d, d2, d3)
 						surface.SetMaterial(AnimProp_BoneList_IconLink)
 						surface.DrawTexturedRect(x, (h-16)/2, 16, 16)
 					end
+				end
+
+				//Right Click: Show a dropdown menu with individual bone copy/paste options
+				line.OnRightClick = function()
+					if !IsValid(ent) then return end
+					local menu = DermaMenu()
+
+					local boneids = back.BoneList:GetSelected()
+
+					//Copy (from JUST the selected bone(s), not the whole model)
+					local name = "Copy settings from " .. #boneids .. " selected bones"
+					if #boneids == 1 then name = "Copy settings from " .. #boneids .. " selected bone" end
+					local option = menu:AddOption(name, function()
+						local copytab = {}
+
+						//Fix some bones not being copied and returning invalid (i.e. playermodel weapon bones)
+						ent:SetupBones()
+						ent:InvalidateBoneCache()
+
+						for k, line in pairs (boneids) do
+							local entry = {}
+
+							if ent.RemapInfo and ent.RemapInfo[line.id] then
+								entry.parent = ent.RemapInfo[line.id].parent
+								entry.ang = ent.RemapInfo[line.id].ang
+							else
+								entry.parent = ""
+								entry.ang = Angle()
+							end
+
+							local bonename = ent:GetBoneName(line.id)
+							//MsgN(line.id, " == ", bonename)
+
+							if bonename != "__INVALIDBONE__" then
+								entry.bonename = bonename
+								table.insert(copytab, entry)
+							end
+						end
+						AnimProp_Remap_CopyPasteInfo = copytab //this is a global table shared by all animprop editors, so users can copy remapinfo from one prop to another
+						//PrintTable(AnimProp_Remap_CopyPasteInfo)
+
+						local name = "Copied " .. table.Count(copytab) .. " bones"
+						if table.Count(copytab) == 1 then name = "Copied " .. table.Count(copytab) .. " bone" end
+						GAMEMODE:AddNotify(name, NOTIFY_GENERIC, 2)
+						surface.PlaySound("ambient/water/drip" .. math.random(1, 4) .. ".wav")
+					end)
+					option:SetImage("icon16/page_copy.png")
+
+					//Paste (by selection, not by name)
+					local count = 0
+					if istable(AnimProp_Remap_CopyPasteInfo) then count = #AnimProp_Remap_CopyPasteInfo end
+					local name = "Paste " .. count .. " bone settings to " .. #boneids ..  " selected bones"
+					if count == 1 and #boneids == 1 then
+						name = "Paste " .. count .. " bone setting to " .. #boneids ..  " selected bone"
+					elseif count == 1 then
+						name = "Paste " .. count .. " bone setting to " .. #boneids ..  " selected bones"
+					elseif #boneids == 1 then
+						name = "Paste " .. count .. " bone settings to " .. #boneids ..  " selected bone"
+					end
+					local pastefunc = function(filter)
+						local copy_index = 1
+						local pastetab = {}
+
+						//Fix some bones not being copied and returning invalid (i.e. playermodel weapon bones)
+						ent:SetupBones()
+						ent:InvalidateBoneCache()
+
+						//How this works:
+						//The intended use of this feature is to allow the user to A: copy the settings of 1 bone to 1 other bone,
+						//B: copy the settings of 1 bone to multiple other bones, or C: copy the settings of a set of bones to 
+						//another same-sized set (i.e. copying the settings from all the left fingers to all the right fingers). 
+						//However, the way we built this works with either set being any size, so we can also, say, copy just 2 
+						//bones to a big set of bones (bone 1 gets copy 1, bone 2 gets copy 2, then bone 3 gets copy 1 again, and 
+						//so on), or copy a big set of bones to just a few (bone 1 gets copy 1, and so on until we run out of bones 
+						//to copy to, leaving the rest of the copies unused)
+
+						for k, line in pairs (boneids) do
+							local bonename = ent:GetBoneName(line.id)
+							//MsgN(line.id, " == ", bonename)
+
+							local entry = table.Copy(AnimProp_Remap_CopyPasteInfo[copy_index])
+							entry.bonename = bonename
+							table.insert(pastetab, entry)
+
+							copy_index = copy_index + 1
+							if copy_index > count then copy_index = 1 end
+						end
+
+						local count = SendRemapInfoPasteToServer(pastetab, filter)
+						if count != nil then
+							local name = "Pasted " .. count .. " bones"
+							if count == 1 then name = "Pasted " .. count .. " bone" end
+							GAMEMODE:AddNotify(name, NOTIFY_GENERIC, 2)
+							surface.PlaySound("common/wpn_select.wav")
+						end
+					end
+					local submenu, option = menu:AddSubMenu(name, function() pastefunc() end)
+					option:SetEnabled(count > 0)
+					option:SetImage("icon16/page_paste.png")
+					submenu:SetMinimumWidth(0)
+					if count > 0 then
+						local function PerformLayout(self, w, h)
+							self:SizeToContents()
+							self:SetWide( self:GetWide() )//+ 30 ) //the only change; remove extra right-side width
+
+							w = math.max( self:GetParent():GetWide(), self:GetWide() )
+
+							self:SetSize( w, 22 )
+
+							if ( IsValid( self.SubMenuArrow ) ) then
+
+								self.SubMenuArrow:SetSize( 15, 15 )
+								self.SubMenuArrow:CenterVertical()
+								self.SubMenuArrow:AlignRight( 4 )
+
+							end
+
+							DButton.PerformLayout( self, w, h )
+						end
+
+						local option = submenu:AddOption("(only 'Target Bone')", function() pastefunc("parent") end)
+						option:SetTextInset(9,0)
+						option.PerformLayout = PerformLayout
+						
+						local option = submenu:AddOption("(only 'Angle')", function() pastefunc("ang") end)
+						option:SetTextInset(9,0)
+						option.PerformLayout = PerformLayout
+					end
+
+					menu:Open()
 				end
 			end
 
