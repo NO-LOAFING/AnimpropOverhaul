@@ -1901,6 +1901,121 @@ function PANEL:RebuildControls(tab, d, d2, d3)
 						option.PerformLayout = PerformLayout
 					end
 
+					menu:AddSpacer()
+					menu:AddSpacer() //emphasis?
+
+					//Also put the whole-model copy/paste options here - this is kind of an awkward place for them because it's
+					//inconsistent with advbone, but there's nowhere else good to put these, and they're too useful to leave out.
+
+					//Copy (all bones)
+					local option = menu:AddOption("Copy settings from all bones", function()
+						local copytab = {}
+
+						//Fix some bones not being copied and returning invalid (i.e. playermodel weapon bones)
+						ent:SetupBones()
+						ent:InvalidateBoneCache()
+
+						local function CopyBone(id)
+							local bonename = ent:GetBoneName(id)
+							//MsgN(id, " == ", bonename)
+							if bonename != "__INVALIDBONE__" then
+								local entry = {}
+
+								if ent.RemapInfo and ent.RemapInfo[id] then
+									entry.parent = ent.RemapInfo[id].parent
+									entry.ang = ent.RemapInfo[id].ang
+								else
+									entry.parent = ""
+									entry.ang = Angle()
+								end
+
+								entry.bonename = bonename
+								table.insert(copytab, entry)
+
+								return true
+							end
+						end
+
+						if !GetConVar("cl_animprop_editor_bone_hierarchyview"):GetBool() then
+							for id = 0, ent:GetBoneCount() - 1 do
+								CopyBone(id)
+							end
+						else
+							//If we're displaying bones in hierarchical order, then we should also be *copying* them in
+							//hierarchical order, so that pasting the settings via selection matches the order they're 
+							//listed in (like it does when they're in numerical order)
+							local function CopyBonesInHierarchy(id)
+								local name = ent:GetBoneName(id)
+								if CopyBone(id) then
+									for _, v in ipairs (ent:GetChildBones(id)) do
+										CopyBonesInHierarchy(v)
+									end
+								end
+							end
+							for id = 0, ent:GetBoneCount() - 1 do
+								local id2 = ent:GetBoneParent(id) 
+								if id2 == nil or id2 < 0 then
+									CopyBonesInHierarchy(id)
+								end
+							end
+						end
+						AnimProp_Remap_CopyPasteInfo = copytab
+						//PrintTable(AnimProp_Remap_CopyPasteInfo)
+
+						local name = "Copied " .. table.Count(copytab) .. " bones"
+						if table.Count(copytab) == 1 then name = "Copied " .. table.Count(copytab) .. " bone" end
+						GAMEMODE:AddNotify(name, NOTIFY_GENERIC, 2)
+						surface.PlaySound("ambient/water/drip" .. math.random(1, 4) .. ".wav")
+					end)
+					option:SetImage("icon16/page_copy.png")
+
+					//Paste (by name)
+					local count = 0
+					if istable(AnimProp_Remap_CopyPasteInfo) then count = #AnimProp_Remap_CopyPasteInfo end
+					local name = "Paste " .. count .. " bone settings by name"
+					if count == 1 then name = "Paste " .. count .. " bone setting by name" end
+					local pastefunc = function(filter)
+						local count = SendRemapInfoPasteToServer(AnimProp_Remap_CopyPasteInfo, filter)
+						if count != nil then
+							local name = "Pasted " .. count .. " bones"
+							if count == 1 then name = "Pasted " .. count .. " bone" end
+							GAMEMODE:AddNotify(name, NOTIFY_GENERIC, 2)
+							surface.PlaySound("common/wpn_select.wav")
+						end
+					end
+					local submenu, option = menu:AddSubMenu(name, function() pastefunc() end)
+					option:SetEnabled(count > 0)
+					option:SetImage("icon16/page_paste.png")
+					submenu:SetMinimumWidth(0)
+					if count > 0 then
+						local function PerformLayout(self, w, h)
+							self:SizeToContents()
+							self:SetWide( self:GetWide() )//+ 30 ) //the only change; remove extra right-side width
+
+							w = math.max( self:GetParent():GetWide(), self:GetWide() )
+
+							self:SetSize( w, 22 )
+
+							if ( IsValid( self.SubMenuArrow ) ) then
+
+								self.SubMenuArrow:SetSize( 15, 15 )
+								self.SubMenuArrow:CenterVertical()
+								self.SubMenuArrow:AlignRight( 4 )
+
+							end
+
+							DButton.PerformLayout( self, w, h )
+						end
+
+						local option = submenu:AddOption("(only 'Target Bone')", function() pastefunc("parent") end)
+						option:SetTextInset(9,0)
+						option.PerformLayout = PerformLayout
+						
+						local option = submenu:AddOption("(only 'Angle')", function() pastefunc("ang") end)
+						option:SetTextInset(9,0)
+						option.PerformLayout = PerformLayout
+					end
+
 					menu:Open()
 				end
 			end
