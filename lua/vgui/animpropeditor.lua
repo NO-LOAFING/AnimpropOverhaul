@@ -1820,6 +1820,70 @@ function PANEL:RebuildControls(tab, d, d2, d3)
 					end)
 					option:SetImage("icon16/page_copy.png")
 
+					//Also put the whole-model copy/paste options here - this is kind of an awkward place for them because it's
+					//inconsistent with advbone, but there's nowhere else good to put these, and they're too useful to leave out.
+					//Copy (all bones)
+					local option = menu:AddOption("Copy settings from all bones", function()
+						local copytab = {}
+
+						//Fix some bones not being copied and returning invalid (i.e. playermodel weapon bones)
+						ent:SetupBones()
+						ent:InvalidateBoneCache()
+
+						local function CopyBone(id)
+							local bonename = ent:GetBoneName(id)
+							//MsgN(id, " == ", bonename)
+							if bonename != "__INVALIDBONE__" then
+								local entry = {}
+
+								if ent.RemapInfo and ent.RemapInfo[id] then
+									entry.parent = ent.RemapInfo[id].parent
+									entry.ang = ent.RemapInfo[id].ang
+								else
+									entry.parent = ""
+									entry.ang = Angle()
+								end
+
+								entry.bonename = bonename
+								table.insert(copytab, entry)
+
+								return true
+							end
+						end
+
+						if !GetConVar("cl_animprop_editor_bone_hierarchyview"):GetBool() then
+							for id = 0, ent:GetBoneCount() - 1 do
+								CopyBone(id)
+							end
+						else
+							//If we're displaying bones in hierarchical order, then we should also be *copying* them in
+							//hierarchical order, so that pasting the settings via selection matches the order they're 
+							//listed in (like it does when they're in numerical order)
+							local function CopyBonesInHierarchy(id)
+								local name = ent:GetBoneName(id)
+								if CopyBone(id) then
+									for _, v in ipairs (ent:GetChildBones(id)) do
+										CopyBonesInHierarchy(v)
+									end
+								end
+							end
+							for id = 0, ent:GetBoneCount() - 1 do
+								local id2 = ent:GetBoneParent(id) 
+								if id2 == nil or id2 < 0 then
+									CopyBonesInHierarchy(id)
+								end
+							end
+						end
+						AnimProp_Remap_CopyPasteInfo = copytab
+						//PrintTable(AnimProp_Remap_CopyPasteInfo)
+
+						local name = "Copied " .. table.Count(copytab) .. " bones"
+						if table.Count(copytab) == 1 then name = "Copied " .. table.Count(copytab) .. " bone" end
+						GAMEMODE:AddNotify(name, NOTIFY_GENERIC, 2)
+						surface.PlaySound("ambient/water/drip" .. math.random(1, 4) .. ".wav")
+					end)
+					option:SetImage("icon16/page_copy.png")
+
 					//Paste (by selection, not by name)
 					local count = 0
 					if istable(AnimProp_Remap_CopyPasteInfo) then count = #AnimProp_Remap_CopyPasteInfo end
@@ -1900,74 +1964,6 @@ function PANEL:RebuildControls(tab, d, d2, d3)
 						option:SetTextInset(9,0)
 						option.PerformLayout = PerformLayout
 					end
-
-					menu:AddSpacer()
-					menu:AddSpacer() //emphasis?
-
-					//Also put the whole-model copy/paste options here - this is kind of an awkward place for them because it's
-					//inconsistent with advbone, but there's nowhere else good to put these, and they're too useful to leave out.
-
-					//Copy (all bones)
-					local option = menu:AddOption("Copy settings from all bones", function()
-						local copytab = {}
-
-						//Fix some bones not being copied and returning invalid (i.e. playermodel weapon bones)
-						ent:SetupBones()
-						ent:InvalidateBoneCache()
-
-						local function CopyBone(id)
-							local bonename = ent:GetBoneName(id)
-							//MsgN(id, " == ", bonename)
-							if bonename != "__INVALIDBONE__" then
-								local entry = {}
-
-								if ent.RemapInfo and ent.RemapInfo[id] then
-									entry.parent = ent.RemapInfo[id].parent
-									entry.ang = ent.RemapInfo[id].ang
-								else
-									entry.parent = ""
-									entry.ang = Angle()
-								end
-
-								entry.bonename = bonename
-								table.insert(copytab, entry)
-
-								return true
-							end
-						end
-
-						if !GetConVar("cl_animprop_editor_bone_hierarchyview"):GetBool() then
-							for id = 0, ent:GetBoneCount() - 1 do
-								CopyBone(id)
-							end
-						else
-							//If we're displaying bones in hierarchical order, then we should also be *copying* them in
-							//hierarchical order, so that pasting the settings via selection matches the order they're 
-							//listed in (like it does when they're in numerical order)
-							local function CopyBonesInHierarchy(id)
-								local name = ent:GetBoneName(id)
-								if CopyBone(id) then
-									for _, v in ipairs (ent:GetChildBones(id)) do
-										CopyBonesInHierarchy(v)
-									end
-								end
-							end
-							for id = 0, ent:GetBoneCount() - 1 do
-								local id2 = ent:GetBoneParent(id) 
-								if id2 == nil or id2 < 0 then
-									CopyBonesInHierarchy(id)
-								end
-							end
-						end
-						AnimProp_Remap_CopyPasteInfo = copytab
-						//PrintTable(AnimProp_Remap_CopyPasteInfo)
-
-						local name = "Copied " .. table.Count(copytab) .. " bones"
-						if table.Count(copytab) == 1 then name = "Copied " .. table.Count(copytab) .. " bone" end
-						GAMEMODE:AddNotify(name, NOTIFY_GENERIC, 2)
-						surface.PlaySound("ambient/water/drip" .. math.random(1, 4) .. ".wav")
-					end)
-					option:SetImage("icon16/page_copy.png")
 
 					//Paste (by name)
 					local count = 0
