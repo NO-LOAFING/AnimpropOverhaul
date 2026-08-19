@@ -3973,6 +3973,7 @@ if CLIENT then
 							for k, v in pairs (self.SavedParentBoneMatrices) do
 								if !parentbones[k] then
 									ParentNoChange = false
+									break
 								elseif ParentNoChange then
 									for k2, v2 in pairs (v) do
 										if ParentNoChange then
@@ -4004,10 +4005,10 @@ if CLIENT then
 			else
 				self.SavedParentBoneMatrices = nil
 			end
+			self.AdvBone_Asleep = skip //this tells the think func to stop calculating render bounds
 		end
 
 		//If we're going to skip, then use cached bone matrices instead of computing new ones, and stop here
-		self.AdvBone_Asleep = skip //this tells the think func to stop calculating render bounds
 		if skip then
 			if parent and self.AdvBone_OriginMatrix then
 				local matr = self.AdvBone_OriginMatrix
@@ -4239,7 +4240,7 @@ if CLIENT then
 
 						matr = targetmatr
 
-						if (self.AdvBone_BoneInfo[i].scale == false) then
+						if !self.AdvBone_BoneInfo[i].scale then
 							//Since we don't want to use the target bone's scale, rescale the matrix so it's back to normal
 							matr:SetScale(mdlsclvec)  //we still want to inherit the overall model scale for things like npcs and animated props
 
@@ -4291,7 +4292,7 @@ if CLIENT then
 						//Create a matrix for the model origin
 						matr = Matrix()
 						//If our origin isn't following a bone, then that means it's actually following the parent's origin, so inherit origin manip stuff from it
-						if parent and parent.AdvBone_OriginMatrix and self.AdvBone_BoneInfo[i].scale != false then
+						if parent and parent.AdvBone_OriginMatrix and self.AdvBone_BoneInfo[i].scale then
 							matr:Set(parent.AdvBone_OriginMatrix)
 					
 							matr:Translate(self:GetManipulateBonePosition(-1))
@@ -4348,7 +4349,7 @@ if CLIENT then
 						end
 				
 						if parentmatr then
-							if (self.AdvBone_BoneInfo[i].scale != false) then
+							if self.AdvBone_BoneInfo[i].scale then
 								//Start off with the parent bone matrix
 								matr = parentmatr
 
