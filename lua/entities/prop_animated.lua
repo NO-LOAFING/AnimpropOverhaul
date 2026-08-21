@@ -3026,8 +3026,8 @@ if CLIENT then
 		Animprop_IsSkyboxDrawing = false
 	end)
 
-	CreateClientConVar("cl_animprop_debug_sleep", 0, false, false, "If 1, show sleep status of prop_animated's BuildBonePositions function (red = asleep, green = awake, no color = not running BuildBonePositions)", 0, 1)
-	local cv_debug_sleep = GetConVar("cl_animprop_debug_sleep")
+	CreateClientConVar("cl_advbone_debug_sleep", 0, false, false, "If 1, show sleep status of ent_advbonemerge and prop_animated's BuildBonePositions function (red = asleep, green = awake, no color = not running BuildBonePositions)", 0, 1)
+	local cv_debug_sleep = GetConVar("cl_advbone_debug_sleep")
 
 	function ENT:Draw(flag)
 
@@ -3768,6 +3768,12 @@ end
 //ADVANCED BONEMERGE FUNCTIONS//
 ////////////////////////////////
 
+//this convar has to be shared between advbone and animprop, because both addons' BuildBonePositions functions need to match 
+//the time interval used by advbone's AdvBone_ResetBoneChangeTimeOnChildren function, but it also still needs to work properly 
+//if animprop uses it without advbone installed (i.e. when remapping). this means a single line of duplicate code, lame!
+local cv_sleep = CreateConVar("sv_advbone_sleep", 0.1, {FCVAR_ARCHIVE, FCVAR_REPLICATED}, "Time interval used by ent_advbonemerge and prop_animated to enter sleep mode - if the entity's bones haven't changed position for this long, then fall asleep and stop building new bone positions to save perf, until woken up by entity movement, parent bone movement, etc.", 0, 1) 
+//this is serverside because we also use it to throttle how often the server can send messages to clients telling them to wake ents back up; see AdvBone_ResetBoneChangeTimeOnChildren in ent_advbonemerge
+
 if CLIENT then
 
 	function ENT:DoAdvBonemerge()
@@ -3940,7 +3946,8 @@ if CLIENT then
 			//scale, or pose parameters, in various places in this file.
 			//Also make sure SavedBoneMatrices isn't empty, so we don't start skipping before we've actually built our bone positions
 			//(can happen with animprops that spawn offscreen, only seems to happen with unmerged props so no need to add this to ent_advbonemerge)
-			if !self:GetControlMovementPoseParams() and !table.IsEmpty(self.SavedBoneMatrices) and self.LastBoneChangeTime + (FrameTime() * 10) < curtime then
+			if !self:GetControlMovementPoseParams() and !table.IsEmpty(self.SavedBoneMatrices) and
+			self.AdvBone_AllowSleep and self.LastBoneChangeTime + cv_sleep:GetFloat() < curtime then
 				if !parent or (parent.AdvBone_LastParentBoneCheckTime and parent.AdvBone_LastParentBoneCheckTime >= curtime) then
 					//This check only needs to be performed once per frame, even if there are multiple models merged to one parent
 					skip = true
@@ -4532,10 +4539,7 @@ if CLIENT then
 							end
 						end
 					else
-						//MsgN(matr)
-						//MsgN("!=")
-						//MsgN(self.SavedBoneMatrices[i])
-						//MsgN("")
+						//MsgN(self:GetBoneName(i), "\n", matr, "\n != \n", self.SavedBoneMatrices[i], "\n")
 						BonesHaveChanged = true
 					end
 				end
@@ -4557,6 +4561,14 @@ if CLIENT then
 		if BonesHaveChanged then
 			self.LastBoneChangeTime = curtime
 		end
+		//(ported from advbone; this may not be necessary for prop_animated, i can't recreate any
+		//of the issues this is meant to fix, but this is cheap, so better safe than sorry here)
+		//As a failsafe, if FPS is low enough to make the frame time longer than sv_advbone_sleep (<10 FPS by default), then make sure 
+		//to compare at *least* two frames to try to make sure that our parent ent's bones have stopped moving around - otherwise, we'll 
+		//update bones once, and then fall asleep in the very next frame without checking. This is bad because it can cause this model to 
+		//freeze intermittently while the parent animates (i.e. gun attachments on a character playing a subtle idle animation), or fall 
+		//asleep in a position out-of-sync with the parent (i.e. bones merged to jigglebones)
+		self.AdvBone_AllowSleep = !BonesHaveChanged
 	end
 
 	function ENT:CalcAbsolutePosition(pos, ang)
