@@ -327,6 +327,8 @@ function ENT:SetupDataTables()
 	self:NetworkVar("Bool", 20, "PuppeteerAlpha")
 	self:NetworkVar("Vector", 3, "PuppeteerPos")
 
+	self:NetworkVar("Bool", 21, "Invert") //(Advanced Bonemerge)
+
 end
 
 
@@ -3114,7 +3116,9 @@ if CLIENT then
 				self:SetMaterial("")
 			end
 		end
+		if self:GetInvert() then render.CullMode(MATERIAL_CULLMODE_CW) end
 		self:DrawModel()
+		render.CullMode(MATERIAL_CULLMODE_CCW)
 		if self.IsPuppeteer then
 			//Reset blending value once we're done so it doesn't bleed into other draw funcs
 			render.SetBlend(1)
