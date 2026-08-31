@@ -1616,10 +1616,10 @@ function PANEL:RebuildControls(tab, d, d2, d3)
 						//Also apply the new RemapInfo clientside
 						local i = {
 							parent = serverentry.parent,
-							ang = Angle(serverentry.ang),
+							ang = serverentry.ang,
 						}
 						if i.parent == nil then i.parent = ent.RemapInfo[id].parent end
-						if i.ang == nil then i.ang = ent.RemapInfo[id].ang end
+						if i.ang == nil then i.ang = ent.RemapInfo[id].ang else i.ang = Angle(i.ang) end
 						ent.RemapInfo[id] = i
 					end
 					if !parent_changed then
@@ -1637,7 +1637,7 @@ function PANEL:RebuildControls(tab, d, d2, d3)
 					end
 
 					//If nothing has changed for this bone, don't bother sending it to the server
-					if !(!serverentry.targetbone and !serverentry.ang) then
+					if !(!serverentry.parent and !serverentry.ang) then
 						table.insert(serverinfo, serverentry)
 					end
 					//Still keep a count of the number of bones the paste applied to, even if nothing changed
